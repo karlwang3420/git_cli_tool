@@ -1,0 +1,13 @@
+branches:
+  - "feature/f1"
+  - "development"
+  - "main"
+
+repositories:
+  - "H:/path/to/parent":
+      - "repository1"
+      - "repository2"
+
+  - "H:/path/to/parent2":
+      - "repository1"
+      - "repository2"
