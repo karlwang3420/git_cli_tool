@@ -392,3 +392,151 @@ func SwitchBranchesParallelWithStash(repositories []config.Repository, branches 
 
 	wg.Wait()
 }
+
+// ApplyStash applies a specific stash in a repository
+func ApplyStash(repoPath string, stashName string) error {
+	absPath, err := filepath.Abs(repoPath)
+	if err != nil {
+		return fmt.Errorf("failed to resolve absolute path: %v", err)
+	}
+
+	// Check if repository exists
+	if _, err := os.Stat(filepath.Join(absPath, ".git")); os.IsNotExist(err) {
+		return fmt.Errorf("not a git repository or directory does not exist")
+	}
+
+	// Find stash with matching name
+	listCmd := exec.Command("git", "-C", absPath, "stash", "list")
+	listOutput, err := listCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to list stashes: %v", err)
+	}
+
+	stashLines := strings.Split(string(listOutput), "\n")
+	stashIndex := ""
+
+	// Format of stash line: stash@{0}: On branch: message
+	for _, line := range stashLines {
+		if strings.Contains(line, stashName) {
+			// Extract the stash index (e.g., stash@{0})
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) > 0 {
+				stashIndex = strings.TrimSpace(parts[0])
+				break
+			}
+		}
+	}
+
+	if stashIndex == "" {
+		return fmt.Errorf("no stash found with name '%s'", stashName)
+	}
+
+	// Apply the stash
+	applyCmd := exec.Command("git", "-C", absPath, "stash", "apply", stashIndex)
+	applyOutput, err := applyCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to apply stash %s: %v\n%s", stashIndex, err, applyOutput)
+	}
+
+	fmt.Printf("Successfully applied stash %s in %s\n", stashIndex, repoPath)
+	return nil
+}
+
+// SwitchToBranch switches to a specific branch in a repository
+func SwitchToBranch(repoPath string, branch string) error {
+	absPath, err := filepath.Abs(repoPath)
+	if err != nil {
+		return fmt.Errorf("failed to resolve absolute path: %v", err)
+	}
+
+	// Check if repository exists
+	if _, err := os.Stat(filepath.Join(absPath, ".git")); os.IsNotExist(err) {
+		return fmt.Errorf("not a git repository or directory does not exist")
+	}
+
+	// Check if branch exists locally
+	branchExists, err := CheckBranchExists(absPath, branch)
+	if err != nil {
+		return fmt.Errorf("failed to check if branch %s exists: %v", branch, err)
+	}
+
+	// If branch exists locally, switch to it
+	if branchExists {
+		cmd := exec.Command("git", "-C", absPath, "checkout", branch)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("git checkout failed for branch %s: %v\n%s", branch, err, output)
+		}
+		fmt.Printf("Successfully switched to branch %s in %s\n", branch, repoPath)
+		return nil
+	}
+
+	// If branch doesn't exist locally, try to find and check it out from remote
+	fmt.Printf("Branch %s not found locally in %s, checking remote...\n", branch, repoPath)
+	
+	// Fetch from remote
+	fetchCmd := exec.Command("git", "-C", absPath, "fetch")
+	fetchOutput, err := fetchCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git fetch failed: %v\n%s", err, fetchOutput)
+	}
+	
+	// Check if remote branch exists
+	remoteBranchExists, err := CheckRemoteBranchExists(absPath, branch)
+	if err != nil {
+		return fmt.Errorf("failed to check if remote branch %s exists: %v", branch, err)
+	}
+	
+	if remoteBranchExists {
+		// Create tracking branch
+		trackCmd := exec.Command("git", "-C", absPath, "checkout", "-b", branch, "--track", "origin/"+branch)
+		trackOutput, err := trackCmd.CombinedOutput()
+		if err != nil {
+			// If branch creation fails, try direct checkout of remote branch
+			checkoutCmd := exec.Command("git", "-C", absPath, "checkout", branch)
+			checkoutOutput, err := checkoutCmd.CombinedOutput()
+			if err != nil {
+				return fmt.Errorf("failed to checkout remote branch %s: %v\n%s", branch, err, checkoutOutput)
+			}
+		} else {
+			_ = trackOutput // Use output to avoid unused variable warning
+		}
+		fmt.Printf("Successfully switched to branch %s in %s\n", branch, repoPath)
+		return nil
+	}
+
+	return fmt.Errorf("branch %s not found locally or remotely in %s", branch, repoPath)
+}
+
+// RevertToState reverts repositories to their state in a given BranchState, including stash application
+func RevertToState(state config.BranchState, applyStashes bool) error {
+	fmt.Printf("Reverting to branch state from %s\n", state.Timestamp)
+	if state.Description != "" {
+		fmt.Printf("Description: %s\n", state.Description)
+	}
+	
+	for repoPath, repoState := range state.Repositories {
+		// Skip empty branches (there was probably an error when recording it)
+		if repoState.Branch == "" {
+			fmt.Printf("Skipping %s: no branch recorded in history\n", repoPath)
+			continue
+		}
+		
+		// Switch to the recorded branch
+		err := SwitchToBranch(repoPath, repoState.Branch)
+		if err != nil {
+			fmt.Printf("Error switching branch in %s: %v\n", repoPath, err)
+			continue
+		}
+		
+		// Apply stash if needed
+		if applyStashes && repoState.StashName != "" {
+			err := ApplyStash(repoPath, repoState.StashName)
+			if err != nil {
+				fmt.Printf("Error applying stash in %s: %v\n", repoPath, err)
+			}
+		}
+	}
+	
+	return nil
+}
