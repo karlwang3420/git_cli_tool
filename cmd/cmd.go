@@ -21,6 +21,7 @@ var rootCmd = &cobra.Command{
 func Initialize() {
 	var configFile string
 	var parallel bool
+	var autostash string
 
 	// Switch command
 	switchCmd := &cobra.Command{
@@ -47,9 +48,17 @@ func Initialize() {
 			}
 
 			if parallel {
-				git.SwitchBranchesParallel(repositories, config.Branches)
+				if autostash != "" {
+					git.SwitchBranchesParallelWithStash(repositories, config.Branches, autostash)
+				} else {
+					git.SwitchBranchesParallel(repositories, config.Branches)
+				}
 			} else {
-				git.SwitchBranchesSequential(repositories, config.Branches)
+				if autostash != "" {
+					git.SwitchBranchesSequentialWithStash(repositories, config.Branches, autostash)
+				} else {
+					git.SwitchBranchesSequential(repositories, config.Branches)
+				}
 			}
 		},
 	}
@@ -133,6 +142,7 @@ func Initialize() {
 	// Add flags to commands
 	switchCmd.Flags().StringVarP(&configFile, "config", "c", "gitswitch.yml", "Path to configuration file")
 	switchCmd.Flags().BoolVarP(&parallel, "parallel", "p", false, "Switch branches in parallel")
+	switchCmd.Flags().StringVarP(&autostash, "autostash", "a", "", "Stash changes with the provided name before switching branches")
 	listCmd.Flags().StringVarP(&configFile, "config", "c", "gitswitch.yml", "Path to configuration file")
 	tagsCmd.Flags().StringVarP(&configFile, "config", "c", "gitswitch.yml", "Path to configuration file")
 	tagsCmd.Flags().BoolVarP(&parallel, "parallel", "p", false, "Process tags in parallel")

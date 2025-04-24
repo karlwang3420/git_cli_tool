@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"gopkg.in/yaml.v3"
 )
@@ -43,13 +44,33 @@ func ReadConfig(configPath string) (*Configuration, error) {
 		return nil, fmt.Errorf("failed to resolve absolute path: %v", err)
 	}
 
+	// Read the file as plain text first
 	data, err := os.ReadFile(absPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %v", err)
 	}
 
+	// Convert content to string
+	content := string(data)
+
+	// On Windows, ensure backslashes in paths are properly handled
+	// by doubling them in the YAML content before parsing
+	if filepath.Separator == '\\' {
+		// Use regex to find paths in the format "X:\path\to\something"
+		re := regexp.MustCompile(`"([A-Za-z]:(?:\\[^"\\]+)+)"`)
+		content = re.ReplaceAllStringFunc(content, func(match string) string {
+			// Remove the surrounding quotes
+			path := match[1 : len(match)-1]
+			// Convert to forward slashes which YAML handles better
+			normalizedPath := filepath.ToSlash(path)
+			// Return with quotes
+			return `"` + normalizedPath + `"`
+		})
+	}
+
+	// Now parse the modified content as YAML
 	var config Configuration
-	if err := yaml.Unmarshal(data, &config); err != nil {
+	if err := yaml.Unmarshal([]byte(content), &config); err != nil {
 		return nil, fmt.Errorf("failed to parse config file: %v", err)
 	}
 

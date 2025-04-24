@@ -294,3 +294,101 @@ func ProcessTagsParallel(repositories []config.Repository) {
 
 	wg.Wait()
 }
+
+// StashChanges stashes changes in a repository with the given name
+func StashChanges(repoPath string, stashName string) error {
+	absPath, err := filepath.Abs(repoPath)
+	if err != nil {
+		return fmt.Errorf("failed to resolve absolute path: %v", err)
+	}
+
+	// Check if repository exists
+	if _, err := os.Stat(filepath.Join(absPath, ".git")); os.IsNotExist(err) {
+		return fmt.Errorf("not a git repository or directory does not exist")
+	}
+
+	// Check if there are changes to stash
+	statusCmd := exec.Command("git", "-C", absPath, "status", "--porcelain")
+	statusOutput, err := statusCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to get git status: %v", err)
+	}
+
+	// If there are no changes, skip stashing
+	if len(strings.TrimSpace(string(statusOutput))) == 0 {
+		fmt.Printf("No changes to stash in %s\n", repoPath)
+		return nil
+	}
+
+	// Create a detailed message with the stash name
+	message := fmt.Sprintf("GitSwitch: %s", stashName)
+	
+	// Stash changes with the provided name, include untracked files
+	// Use --include-untracked to ensure all files are included, even new ones
+	stashCmd := exec.Command("git", "-C", absPath, "stash", "push", "--include-untracked", "-m", message)
+	stashOutput, err := stashCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to stash changes: %v\n%s", err, stashOutput)
+	}
+
+	fmt.Printf("Successfully stashed changes in %s with message '%s'\n", repoPath, message)
+	fmt.Printf("To view stashed changes: git -C \"%s\" stash list\n", absPath)
+	fmt.Printf("To apply the stash: git -C \"%s\" stash apply\n", absPath)
+	
+	return nil
+}
+
+// SwitchBranchWithFallbackAndStash tries to switch to each branch in the given order, stashing changes if requested
+func SwitchBranchWithFallbackAndStash(repoPath string, branches []string, stashName string) error {
+	// If stashName is not empty, stash changes first
+	if stashName != "" {
+		err := StashChanges(repoPath, stashName)
+		if err != nil {
+			return fmt.Errorf("failed to stash changes: %v", err)
+		}
+	}
+	
+	// Proceed with normal branch switching
+	return SwitchBranchWithFallback(repoPath, branches)
+}
+
+// SwitchBranchesSequentialWithStash switches branches in the provided repositories sequentially, with optional stashing
+func SwitchBranchesSequentialWithStash(repositories []config.Repository, branches []string, stashName string) {
+	for _, repo := range repositories {
+		var err error
+		if stashName != "" {
+			err = SwitchBranchWithFallbackAndStash(repo.Path, branches, stashName)
+		} else {
+			err = SwitchBranchWithFallback(repo.Path, branches)
+		}
+		
+		if err != nil {
+			fmt.Printf("Error switching branch in %s: %v\n", repo.Path, err)
+		}
+	}
+}
+
+// SwitchBranchesParallelWithStash switches branches in the provided repositories in parallel, with optional stashing
+func SwitchBranchesParallelWithStash(repositories []config.Repository, branches []string, stashName string) {
+	var wg sync.WaitGroup
+	wg.Add(len(repositories))
+
+	for _, repo := range repositories {
+		go func(r config.Repository) {
+			defer wg.Done()
+			
+			var err error
+			if stashName != "" {
+				err = SwitchBranchWithFallbackAndStash(r.Path, branches, stashName)
+			} else {
+				err = SwitchBranchWithFallback(r.Path, branches)
+			}
+			
+			if err != nil {
+				fmt.Printf("Error switching branch in %s: %v\n", r.Path, err)
+			}
+		}(repo)
+	}
+
+	wg.Wait()
+}
