@@ -11,6 +11,8 @@ GitSwitch is a command-line tool that helps you efficiently manage branches acro
 - **Hierarchical Configuration**: Manages repositories using a parent-subfolder structure in a YAML configuration file
 - **Parallel Processing**: Option to run operations in parallel for faster execution in large repository structures
 - **Repository Status Overview**: View the current state of all repositories
+- **Stash Management**: Stash your changes before switching branches with automatic tracking
+- **Branch History**: Save and restore previous branch states across all repositories
 
 ## Installation
 
@@ -28,12 +30,12 @@ cd gitswitch
 
 2. Build the application
 ```
-go build -o gitswitch.exe
+go build -o git_cli_tool.exe
 ```
 
 ## Configuration
 
-GitSwitch uses a YAML configuration file (`gitswitch.yml` by default) to define the branches and repositories to manage.
+GitSwitch uses a YAML configuration file (`git_cli_tool.yml` by default) to define the branches and repositories to manage.
 
 ### Example Configuration
 
@@ -67,7 +69,7 @@ In this configuration:
 View the current branch status of all repositories:
 
 ```
-gitswitch list
+git_cli_tool list
 ```
 
 ### Switch Branches
@@ -75,13 +77,23 @@ gitswitch list
 Switch branches in all repositories according to the priority defined in the configuration:
 
 ```
-gitswitch switch
+git_cli_tool switch
 ```
 
 Use parallel processing for faster execution:
 
 ```
-gitswitch switch --parallel
+git_cli_tool switch --parallel
+```
+
+Stash your changes before switching (recommended to avoid conflicts):
+
+```
+git_cli_tool switch --autostash "my-stash-name"
+```
+or using the shorter form:
+```
+git_cli_tool switch -a "my-stash-name"
 ```
 
 ### Refresh Tags
@@ -89,13 +101,41 @@ gitswitch switch --parallel
 Delete all local tags and fetch the latest tags from remotes for all repositories:
 
 ```
-gitswitch tags
+git_cli_tool tags
 ```
 
 Use parallel processing for faster tag refresh:
 
 ```
-gitswitch tags --parallel
+git_cli_tool tags --parallel
+```
+
+### View Branch History
+
+View the history of previous branch states:
+
+```
+git_cli_tool history
+```
+
+### Revert to Previous State
+
+Revert to a previously saved branch state:
+
+```
+git_cli_tool revert <index>
+```
+
+Apply stashes when reverting (on by default):
+
+```
+git_cli_tool revert <index> --apply-stashes
+```
+
+Disable stash application:
+
+```
+git_cli_tool revert <index> --apply-stashes=false
 ```
 
 ### Using a Custom Configuration File
@@ -103,17 +143,35 @@ gitswitch tags --parallel
 You can specify a different configuration file:
 
 ```
-gitswitch list --config other-config.yml
-gitswitch switch --config other-config.yml
-gitswitch tags --config other-config.yml
+git_cli_tool list --config other-config.yml
+git_cli_tool switch --config other-config.yml
+git_cli_tool tags --config other-config.yml
 ```
 
 ## Project Structure
 
+The project has been refactored into a modular structure for better organization:
+
+### Main packages
+
 - `main.go`: Entry point of the application
-- `cmd/cmd.go`: Command-line interface implementation
-- `config/config.go`: Configuration parsing and management
-- `git/git.go`: Git operations implementation
+- `cmd/`: Command-line interface implementation
+  - `cmd.go`: Package documentation
+  - `root.go`: Core command structure and global flags
+  - `switch.go`: Branch switching functionality
+  - `list.go`: Repository listing operations
+  - `tags.go`: Tag management commands
+  - `history.go`: Branch history tracking
+  - `revert.go`: State restoration functionality
+- `config/`: Configuration parsing and management
+  - `config.go`: Core configuration loading
+  - `history.go`: History tracking and state management
+- `git/`: Git operations implementation
+  - `git.go`: Package documentation
+  - `branch.go`: Branch-related operations
+  - `stash.go`: Stash management functions
+  - `tags.go`: Tag operations
+  - `util.go`: Common utility functions
 
 ## License
 
