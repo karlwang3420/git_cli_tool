@@ -1,8 +1,6 @@
 # GitSwitch - Multi-Repository Git Branch Management Tool
 
-### This is created by AI
-
-GitSwitch is a command-line tool that helps you efficiently manage branches across multiple Git repositories. It allows you to switch branches in multiple repositories simultaneously, with fallback logic if preferred branches don't exist, and also provides functionality to refresh Git tags across repositories.
+A command-line tool that helps you efficiently manage branches across multiple Git repositories. It allows you to switch branches in multiple repositories simultaneously, with fallback logic if preferred branches don't exist, and also provides functionality for tag management, branch history tracking, and parallel operations.
 
 ## Features
 
@@ -13,6 +11,7 @@ GitSwitch is a command-line tool that helps you efficiently manage branches acro
 - **Repository Status Overview**: View the current state of all repositories
 - **Stash Management**: Stash your changes before switching branches with automatic tracking
 - **Branch History**: Save and restore previous branch states across all repositories
+- **Pull Operations**: Pull the latest changes from remote repositories
 
 ## Installation
 
@@ -100,7 +99,7 @@ Use parallel processing for faster execution:
 git_cli_tool switch --parallel
 ```
 
-Stash your changes before switching (recommended to avoid conflicts):
+Stash your changes before switching:
 
 ```
 git_cli_tool switch --autostash "my-stash-name"
@@ -108,6 +107,16 @@ git_cli_tool switch --autostash "my-stash-name"
 or using the shorter form:
 ```
 git_cli_tool switch -a "my-stash-name"
+```
+
+Control whether to store branch state history:
+```
+git_cli_tool switch --store-history=false
+```
+
+Add a description to the history entry:
+```
+git_cli_tool switch --description "Switching to feature branch for sprint 10"
 ```
 
 ### Refresh Tags
@@ -154,7 +163,7 @@ git_cli_tool revert <index> --apply-stashes=false
 
 ### Using a Custom Configuration File
 
-You can specify a different configuration file:
+You can specify a different configuration file with any command:
 
 ```
 git_cli_tool list --config other-config.yml
@@ -164,12 +173,12 @@ git_cli_tool tags --config other-config.yml
 
 ## Project Structure
 
-The project has been refactored into a modular structure for better organization:
+The project has a modular structure for better organization:
 
 ### Main packages
 
 - `main.go`: Entry point of the application
-- `cmd/`: Command-line interface implementation
+- `cmd/`: Command-line interface implementation using Cobra
   - `cmd.go`: Package documentation
   - `root.go`: Core command structure and global flags
   - `switch.go`: Branch switching functionality
@@ -177,6 +186,7 @@ The project has been refactored into a modular structure for better organization
   - `tags.go`: Tag management commands
   - `history.go`: Branch history tracking
   - `revert.go`: State restoration functionality
+  - `pull.go`: Repository pull operations
 - `config/`: Configuration parsing and management
   - `config.go`: Core configuration loading
   - `history.go`: History tracking and state management
