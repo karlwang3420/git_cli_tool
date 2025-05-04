@@ -72,6 +72,20 @@ View the current branch status of all repositories:
 git_cli_tool list
 ```
 
+### Pull Latest Changes
+
+Pull the latest changes from remote repositories for all configured repositories:
+
+```
+git_cli_tool pull
+```
+
+Use parallel processing for faster pulling:
+
+```
+git_cli_tool pull --parallel
+```
+
 ### Switch Branches
 
 Switch branches in all repositories according to the priority defined in the configuration:
