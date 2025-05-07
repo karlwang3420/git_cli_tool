@@ -297,3 +297,56 @@ func SwitchToBranch(repoPath string, branch string) error {
 
 	return fmt.Errorf("branch %s not found locally or remotely in %s", branch, repoPath)
 }
+
+// SwitchBranch attempts to switch to the given branch in the specified repository
+func SwitchBranch(repoPath string, branch string, stashChanges bool) error {
+	// Check if we need to stash changes
+	if stashChanges {
+		if err := StashChanges(repoPath, branch); err != nil {
+			return fmt.Errorf("failed to stash changes: %v", err)
+		}
+	}
+
+	// Try to check out the branch directly first
+	cmd := exec.Command("git", "-C", repoPath, "checkout", branch)
+	if output, err := cmd.CombinedOutput(); err == nil {
+		fmt.Printf("Successfully switched to branch %s in %s\n", branch, repoPath)
+		return nil
+	} else {
+		// Branch doesn't exist locally, check if it exists remotely
+		fmt.Printf("Branch %s not found locally in %s, checking remote...\n", branch, repoPath)
+		
+		// Fetch from remote to get latest branches
+		fetchCmd := exec.Command("git", "-C", repoPath, "fetch")
+		if _, err := fetchCmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("failed to fetch from remote: %v", err)
+		}
+		
+		// Check if the branch exists as a remote branch
+		lsRemoteCmd := exec.Command("git", "-C", repoPath, "ls-remote", "--heads", "origin", branch)
+		output, _ := lsRemoteCmd.CombinedOutput()
+		
+		if len(output) > 0 {
+			// Remote branch exists, check it out
+			checkoutCmd := exec.Command("git", "-C", repoPath, "checkout", "-b", branch, "--track", "origin/"+branch)
+			output, err := checkoutCmd.CombinedOutput()
+			
+			if err != nil {
+				// If that failed, maybe the branch already exists locally but is tracking a different remote
+				// Try a simple checkout with tracking
+				checkoutTrackCmd := exec.Command("git", "-C", repoPath, "checkout", "--track", "origin/"+branch)
+				output, err = checkoutTrackCmd.CombinedOutput()
+				if err != nil {
+					return fmt.Errorf("failed to checkout branch %s: %v\n%s", branch, err, string(output))
+				}
+			}
+			
+			fmt.Printf("Successfully switched to branch %s in %s\n", branch, repoPath)
+			return nil
+		} else {
+			// Branch doesn't exist remotely either
+			fmt.Printf("Branch %s not found locally or remotely in %s\n", branch, repoPath)
+			return fmt.Errorf("branch %s not found locally or remotely", branch)
+		}
+	}
+}

@@ -39,30 +39,32 @@ func RunGitCommand(repoPath string, args ...string) (string, error) {
 	return string(output), err
 }
 
-// RevertToState reverts repositories to their state in a given BranchState, including stash application
-func RevertToState(state config.BranchState, applyStashes bool) error {
+// RevertToState reverts all repositories to the state described in the history
+func RevertToState(state config.HistoryState) error {
 	fmt.Printf("Reverting to branch state from %s\n", state.Timestamp)
+	
 	if state.Description != "" {
 		fmt.Printf("Description: %s\n", state.Description)
 	}
-	
-	for repoPath, repoState := range state.Repositories {
-		// Skip empty branches (there was probably an error when recording it)
-		if repoState.Branch == "" {
+
+	// Process each repository in state
+	for repoPath, branchInfo := range state.Repositories {
+		// Skip if there's no branch info (shouldn't happen, but just in case)
+		if branchInfo.Branch == "" {
 			fmt.Printf("Skipping %s: no branch recorded in history\n", repoPath)
 			continue
 		}
 		
 		// Switch to the recorded branch
-		err := SwitchToBranch(repoPath, repoState.Branch)
+		err := SwitchToBranch(repoPath, branchInfo.Branch)
 		if err != nil {
 			fmt.Printf("Error switching branch in %s: %v\n", repoPath, err)
 			continue
 		}
 		
-		// Apply stash if needed
-		if applyStashes && repoState.StashName != "" {
-			err := ApplyStash(repoPath, repoState.StashName)
+		// If there was a stash recorded, try to apply it
+		if branchInfo.Stash != "" {
+			err = ApplyStash(repoPath, branchInfo.Stash)
 			if err != nil {
 				fmt.Printf("Error applying stash in %s: %v\n", repoPath, err)
 			}

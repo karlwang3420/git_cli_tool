@@ -36,101 +36,110 @@ func initSwitchCmd() {
 
 // runSwitchCmd is the main function for the switch command
 func runSwitchCmd(cmd *cobra.Command, args []string) {
+	// Read the configuration file
 	configObj, err := config.ReadConfig(configFile)
 	if err != nil {
 		fmt.Printf("Error reading config: %v\n", err)
 		os.Exit(1)
 	}
 
-	if len(configObj.Branches) == 0 {
+	// Ensure we have branches to switch to
+	if len(configObj.DefaultBranches) == 0 && len(args) == 0 {
 		fmt.Println("No branches specified in the configuration file.")
 		os.Exit(1)
 	}
 
-	// Get the flattened repositories
+	// Get the repositories from the config
 	repositories := configObj.FlattenRepositories()
-	
 	if len(repositories) == 0 {
 		fmt.Println("No repositories found in the configuration file.")
 		os.Exit(1)
 	}
 
-	// Create stash name map to track which repositories had stashes created
-	stashNameByRepo := make(map[string]string)
+	// Determine branches to try
+	var branches []string
+	if len(args) > 0 {
+		branches = args
+	} else {
+		branches = configObj.DefaultBranches
+	}
 
-	// Store current branch state before switching if requested
-	if storeHistory {
-		if historyDescription == "" {
-			historyDescription = fmt.Sprintf("Switch to %s", configObj.Branches[0])
-		}
-		
-		// Save current state before switching
-		_, err := config.CreateBranchStateSnapshot(repositories, historyDescription, nil)
-		if err != nil {
-			fmt.Printf("Warning: Failed to save branch history: %v\n", err)
-		} else {
-			fmt.Println("Current branch state saved to history")
+	// If recording history is enabled, save the current state
+	if configObj.RecordHistory && !dryRun {
+		_, history, err := config.ReadHistory()
+		if err == nil || os.IsNotExist(err) {
+			// Attempt to save the current state
+			state, err := collectCurrentState(repositories)
+			if err != nil {
+				fmt.Printf("Error saving branch history: %v\n", err)
+			} else {
+				config.SaveStateToHistory(state, history)
+				fmt.Println("Current branch state saved to history")
+			}
 		}
 	}
 
+	description := description
+	stashName := stashName
+	
+	// If no description was provided, use generic one
+	if description == "" {
+		description = fmt.Sprintf("Manual switch to %s", strings.Join(branches, ", "))
+	}
+	
+	// If no stashName was provided, use first branch name
+	if stash && stashName == "" && len(branches) > 0 {
+		stashName = branches[0]
+	}
+
+	// If it's a dry run, just print what would happen
+	if dryRun {
+		fmt.Println("Dry run: Showing branch switching plan (not executing)")
+		fmt.Printf("Would switch repositories to branches: %s\n", strings.Join(branches, ", "))
+		if stash {
+			fmt.Printf("Would stash changes with name: %s\n", stashName)
+		}
+		for _, repo := range repositories {
+			fmt.Printf("Would process repository: %s\n", repo.Path)
+		}
+		return
+	}
+	
+	// Actually switch branches now
+	fmt.Printf("Switching repositories to branches: %s\n", strings.Join(branches, ", "))
+	
+	// If stashing, remember which repositories had changes stashed
+	stashedRepos := make(map[string]bool)
+	
+	// Perform the branch switching
 	if parallel {
-		if autostash != "" {
-			// For parallel stashing, we need to capture stash names for history
-			if storeHistory {
-				var wg sync.WaitGroup
-				wg.Add(len(repositories))
-				
-				for _, repo := range repositories {
-					go func(r config.Repository) {
-						defer wg.Done()
-						
-						// Check if there are changes to stash
-						statusCmd := exec.Command("git", "-C", r.Path, "status", "--porcelain")
-						statusOutput, err := statusCmd.CombinedOutput()
-						if err == nil && len(strings.TrimSpace(string(statusOutput))) > 0 {
-							// Only record repositories that will actually have a stash created
-							stashNameByRepo[r.Path] = autostash
-						}
-						
-						// The actual stashing happens in the SwitchBranchesParallelWithStash function
-					}(repo)
-				}
-				
-				wg.Wait()
-			}
-			
-			git.SwitchBranchesParallelWithStash(repositories, configObj.Branches, autostash)
+		if stash {
+			git.SwitchBranchesParallelWithStash(repositories, branches, stashName)
 		} else {
-			git.SwitchBranchesParallel(repositories, configObj.Branches)
+			git.SwitchBranchesParallel(repositories, branches)
 		}
 	} else {
-		if autostash != "" {
-			// For sequential stashing, we can capture stash names as we go
-			for _, repo := range repositories {
-				// Check if there are changes to stash
-				statusCmd := exec.Command("git", "-C", repo.Path, "status", "--porcelain")
-				statusOutput, err := statusCmd.CombinedOutput()
-				if err == nil && len(strings.TrimSpace(string(statusOutput))) > 0 {
-					// Only record repositories that will actually have a stash created
-					stashNameByRepo[repo.Path] = autostash
-				}
-			}
-			
-			git.SwitchBranchesSequentialWithStash(repositories, configObj.Branches, autostash)
+		if stash {
+			git.SwitchBranchesSequentialWithStash(repositories, branches, stashName)
 		} else {
-			git.SwitchBranchesSequential(repositories, configObj.Branches)
+			git.SwitchBranchesSequential(repositories, branches)
 		}
 	}
 	
-	// Store branch state after switching if history is enabled and stashing was used
-	if storeHistory && autostash != "" {
-		// Create a post-switch snapshot that includes stash information
-		postDescription := fmt.Sprintf("After switch to %s with stash '%s'", configObj.Branches[0], autostash)
-		_, err := config.CreateBranchStateSnapshot(repositories, postDescription, stashNameByRepo)
-		if err != nil {
-			fmt.Printf("Warning: Failed to save post-switch branch history: %v\n", err)
-		} else {
-			fmt.Println("Post-switch branch state with stash information saved to history")
+	fmt.Println("Branch switch completed.")
+	
+	// If recording history, save the post-switch state with stash information
+	if configObj.RecordHistory && stash {
+		_, history, err := config.ReadHistory()
+		if err == nil || os.IsNotExist(err) {
+			state, err := collectPostSwitchState(repositories, stashName, stashedRepos)
+			if err != nil {
+				fmt.Printf("Error saving post-switch branch history: %v\n", err)
+			} else {
+				state.Description = description
+				config.SaveStateToHistory(state, history)
+				fmt.Println("Post-switch branch state with stash information saved to history")
+			}
 		}
 	}
 }

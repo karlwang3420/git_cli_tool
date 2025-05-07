@@ -12,48 +12,38 @@ import (
 	"git_cli_tool/config"
 )
 
-// DeleteLocalTags deletes all local tags in the repository
-func DeleteLocalTags(repoPath string) error {
+// DeleteTags deletes all tags in a repository
+func DeleteTags(repoPath string) error {
 	absPath, err := filepath.Abs(repoPath)
 	if err != nil {
 		return fmt.Errorf("failed to resolve absolute path: %v", err)
 	}
 
-	// Check if repository exists
-	if _, err := os.Stat(filepath.Join(absPath, ".git")); os.IsNotExist(err) {
-		return fmt.Errorf("not a git repository or directory does not exist")
-	}
-
-	// Get all local tags
-	listCmd := exec.Command("git", "-C", absPath, "tag")
-	tagList, err := listCmd.CombinedOutput()
+	// Get all tags
+	cmd := exec.Command("git", "-C", absPath, "tag")
+	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to list tags: %v", err)
 	}
 
-	// If there are no tags, we're done
-	tagListStr := strings.TrimSpace(string(tagList))
-	if len(tagListStr) == 0 {
+	tags := strings.Split(strings.TrimSpace(string(output)), "\n")
+	if len(tags) == 0 || (len(tags) == 1 && tags[0] == "") {
 		fmt.Printf("No tags to delete in %s\n", repoPath)
 		return nil
 	}
 
-	// Split tags by newline
-	tags := strings.Split(tagListStr, "\n")
 	fmt.Printf("Found %d tags to delete in %s\n", len(tags), repoPath)
 
-	// Delete tags one by one
+	// Delete each tag locally
 	for _, tag := range tags {
-		tag = strings.TrimSpace(tag)
 		if tag == "" {
 			continue
 		}
-		
+
 		deleteCmd := exec.Command("git", "-C", absPath, "tag", "-d", tag)
 		deleteOutput, err := deleteCmd.CombinedOutput()
 		if err != nil {
-			fmt.Printf("Warning: failed to delete tag %s: %v\n%s\n", tag, err, deleteOutput)
-			// Continue with other tags even if one fails
+			fmt.Printf("Error deleting tag %s: %v\n%s\n", tag, err, deleteOutput)
 		} else {
 			fmt.Printf("Deleted tag %s in %s\n", tag, repoPath)
 		}
@@ -91,7 +81,7 @@ func ProcessTagsSequential(repositories []config.Repository) {
 	for _, repo := range repositories {
 		fmt.Printf("Processing tags for %s\n", repo.Path)
 		
-		err := DeleteLocalTags(repo.Path)
+		err := DeleteTags(repo.Path)
 		if err != nil {
 			fmt.Printf("Error deleting tags in %s: %v\n", repo.Path, err)
 			continue
@@ -115,7 +105,7 @@ func ProcessTagsParallel(repositories []config.Repository) {
 			
 			fmt.Printf("Processing tags for %s\n", r.Path)
 			
-			err := DeleteLocalTags(r.Path)
+			err := DeleteTags(r.Path)
 			if err != nil {
 				fmt.Printf("Error deleting tags in %s: %v\n", r.Path, err)
 				return

@@ -26,6 +26,7 @@ func initTagsCmd() {
 
 // runTagsCmd is the main function for the tags command
 func runTagsCmd(cmd *cobra.Command, args []string) {
+	// Read the configuration file
 	configObj, err := config.ReadConfig(configFile)
 	if err != nil {
 		fmt.Printf("Error reading config: %v\n", err)

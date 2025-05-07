@@ -34,7 +34,7 @@ func runRevertCmd(cmd *cobra.Command, args []string) {
 	// Parse the history index argument
 	index, err := strconv.Atoi(args[0])
 	if err != nil {
-		fmt.Printf("Invalid index: %v\n", err)
+		fmt.Printf("Error parsing index: %v\n", err)
 		os.Exit(1)
 	}
 	
