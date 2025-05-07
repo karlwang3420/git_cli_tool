@@ -6,7 +6,8 @@ import (
 	"os"
 
 	"git_cli_tool/config"
-	
+	"git_cli_tool/log"
+
 	"github.com/spf13/cobra"
 )
 
@@ -26,34 +27,34 @@ func initHistoryCmd() {
 func runHistoryCmd(cmd *cobra.Command, args []string) {
 	history, err := config.LoadBranchHistory()
 	if err != nil {
-		fmt.Printf("Error loading branch history: %v\n", err)
+		log.PrintError(log.ErrHistoryReadFailed, "Error loading branch history", err)
 		os.Exit(1)
 	}
-	
+
 	if len(history.States) == 0 {
-		fmt.Println("No branch history found.")
+		log.PrintInfo("No branch history found.")
 		return
 	}
-	
-	fmt.Println("Branch history:")
-	fmt.Println("--------------")
-	
+
+	log.PrintInfo("Branch history:")
+	log.PrintInfo("--------------")
+
 	// Display history entries from newest to oldest
 	for i := len(history.States) - 1; i >= 0; i-- {
 		state := history.States[i]
-		historyIndex := len(history.States) - 1 - i  // Reverse index for display
-		
-		fmt.Printf("[%d] %s", historyIndex, state.Timestamp)
+		historyIndex := len(history.States) - 1 - i // Reverse index for display
+
+		message := fmt.Sprintf("[%d] %s", historyIndex, state.Timestamp)
 		if state.Description != "" {
-			fmt.Printf(" - %s", state.Description)
+			message += fmt.Sprintf(" - %s", state.Description)
 		}
-		fmt.Println()
-		
+		log.PrintInfo(message)
+
 		// Display a summary of branches in this state
 		repoCount := len(state.Repositories)
 		if repoCount > 0 {
-			fmt.Printf("    %d repositories, ", repoCount)
-			
+			summaryMsg := fmt.Sprintf("    %d repositories", repoCount)
+
 			// Count repositories with stashes
 			stashCount := 0
 			for _, repoState := range state.Repositories {
@@ -61,16 +62,18 @@ func runHistoryCmd(cmd *cobra.Command, args []string) {
 					stashCount++
 				}
 			}
-			
+
 			if stashCount > 0 {
-				fmt.Printf("%d with stashes\n", stashCount)
+				summaryMsg += fmt.Sprintf(", %d with stashes", stashCount)
 			} else {
-				fmt.Println("no stashes")
+				summaryMsg += ", no stashes"
 			}
+
+			log.PrintInfo(summaryMsg)
 		} else {
-			fmt.Println("    No repository information")
+			log.PrintInfo("    No repository information")
 		}
 	}
-	
-	fmt.Println("\nUse 'gitswitch revert <index>' to revert to a specific state")
+
+	log.PrintInfo("\nUse 'git_cli_tool revert <index>' to revert to a specific state")
 }

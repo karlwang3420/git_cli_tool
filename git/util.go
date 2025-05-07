@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"git_cli_tool/config"
+	"git_cli_tool/log"
 )
 
 // ValidateRepository checks if a path is a valid git repository
@@ -35,41 +36,41 @@ func RunGitCommand(repoPath string, args ...string) (string, error) {
 	cmdArgs := append([]string{"-C", repoPath}, args...)
 	cmd := exec.Command("git", cmdArgs...)
 	output, err := cmd.CombinedOutput()
-	
+
 	return string(output), err
 }
 
 // RevertToState reverts all repositories to the state described in the history
 func RevertToState(state config.BranchState, applyStashes bool) error {
-	fmt.Printf("Reverting to branch state from %s\n", state.Timestamp)
-	
+	log.PrintOperation(fmt.Sprintf("Reverting to branch state from %s", state.Timestamp))
+
 	if state.Description != "" {
-		fmt.Printf("Description: %s\n", state.Description)
+		log.PrintInfo(fmt.Sprintf("Description: %s", state.Description))
 	}
 
 	// Process each repository in state
 	for repoPath, branchInfo := range state.Repositories {
 		// Skip if there's no branch info (shouldn't happen, but just in case)
 		if branchInfo.Branch == "" {
-			fmt.Printf("Skipping %s: no branch recorded in history\n", repoPath)
+			log.PrintWarning(fmt.Sprintf("Skipping %s: no branch recorded in history", repoPath))
 			continue
 		}
-		
+
 		// Switch to the recorded branch
 		err := SwitchToBranch(repoPath, branchInfo.Branch)
 		if err != nil {
-			fmt.Printf("Error switching branch in %s: %v\n", repoPath, err)
+			log.PrintErrorNoExit(log.ErrGitCheckoutFailed, fmt.Sprintf("Error switching branch in %s", repoPath), err)
 			continue
 		}
-		
+
 		// If there was a stash recorded and applyStashes is true, try to apply it
 		if branchInfo.StashName != "" && applyStashes {
 			err = ApplyStash(repoPath, branchInfo.StashName)
 			if err != nil {
-				fmt.Printf("Error applying stash in %s: %v\n", repoPath, err)
+				log.PrintErrorNoExit(log.ErrGitApplyStashFailed, fmt.Sprintf("Error applying stash in %s", repoPath), err)
 			}
 		}
 	}
-	
+
 	return nil
 }

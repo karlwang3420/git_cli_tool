@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"git_cli_tool/config"
+	"git_cli_tool/log"
 )
 
 // GetCurrentBranch gets the current branch name of the repository
@@ -37,7 +38,7 @@ func GetCurrentBranch(repoPath string) (string, error) {
 func CheckBranchExists(repoPath string, branch string) (bool, error) {
 	cmd := exec.Command("git", "-C", repoPath, "show-ref", "--verify", "--quiet", "refs/heads/"+branch)
 	err := cmd.Run()
-	
+
 	if err != nil {
 		// Exit code 1 means branch doesn't exist, which is not an error for our purposes
 		if exitError, ok := err.(*exec.ExitError); ok && exitError.ExitCode() == 1 {
@@ -45,7 +46,7 @@ func CheckBranchExists(repoPath string, branch string) (bool, error) {
 		}
 		return false, err
 	}
-	
+
 	return true, nil
 }
 
@@ -53,7 +54,7 @@ func CheckBranchExists(repoPath string, branch string) (bool, error) {
 func CheckRemoteBranchExists(repoPath string, branch string) (bool, error) {
 	cmd := exec.Command("git", "-C", repoPath, "show-ref", "--verify", "--quiet", "refs/remotes/origin/"+branch)
 	err := cmd.Run()
-	
+
 	if err != nil {
 		// Exit code 1 means branch doesn't exist, which is not an error for our purposes
 		if exitError, ok := err.(*exec.ExitError); ok && exitError.ExitCode() == 1 {
@@ -61,7 +62,7 @@ func CheckRemoteBranchExists(repoPath string, branch string) (bool, error) {
 		}
 		return false, err
 	}
-	
+
 	return true, nil
 }
 
@@ -95,13 +96,13 @@ func SwitchBranchWithFallback(repoPath string, branches []string) error {
 				lastError = fmt.Errorf("git checkout failed for branch %s: %v\n%s", branch, err, output)
 				continue
 			}
-			fmt.Printf("Successfully switched to branch %s in %s\n", branch, repoPath)
+			log.PrintSuccess(fmt.Sprintf("Successfully switched to branch %s in %s", branch, repoPath))
 			return nil
 		}
 
 		// If branch doesn't exist locally, try to fetch and check remote
-		fmt.Printf("Branch %s not found locally in %s, fetching from remote...\n", branch, repoPath)
-		
+		log.PrintInfo(fmt.Sprintf("Branch %s not found locally in %s, fetching from remote...", branch, repoPath))
+
 		// Fetch from remote
 		fetchCmd := exec.Command("git", "-C", absPath, "fetch")
 		output, err := fetchCmd.CombinedOutput()
@@ -109,14 +110,14 @@ func SwitchBranchWithFallback(repoPath string, branches []string) error {
 			lastError = fmt.Errorf("git fetch failed: %v\n%s", err, output)
 			continue
 		}
-		
+
 		// Check if remote branch exists
 		remoteBranchExists, err := CheckRemoteBranchExists(absPath, branch)
 		if err != nil {
 			lastError = fmt.Errorf("failed to check if remote branch %s exists: %v", branch, err)
 			continue
 		}
-		
+
 		if remoteBranchExists {
 			// Create tracking branch
 			trackCmd := exec.Command("git", "-C", absPath, "checkout", "-b", branch, "--track", "origin/"+branch)
@@ -130,13 +131,13 @@ func SwitchBranchWithFallback(repoPath string, branches []string) error {
 					continue
 				}
 			}
-			fmt.Printf("Successfully switched to branch %s in %s\n", branch, repoPath)
+			log.PrintSuccess(fmt.Sprintf("Successfully switched to branch %s in %s", branch, repoPath))
 			return nil
 		}
 
 		// If we're on the last branch and none have worked, log that we're trying the next branch
 		if i < len(branches)-1 {
-			fmt.Printf("Branch %s not found locally or remotely in %s, trying next branch...\n", branch, repoPath)
+			log.PrintInfo(fmt.Sprintf("Branch %s not found locally or remotely in %s, trying next branch...", branch, repoPath))
 		}
 	}
 
@@ -152,7 +153,7 @@ func SwitchBranchesSequential(repositories []config.Repository, branches []strin
 	for _, repo := range repositories {
 		err := SwitchBranchWithFallback(repo.Path, branches)
 		if err != nil {
-			fmt.Printf("Error switching branch in %s: %v\n", repo.Path, err)
+			log.PrintErrorNoExit(log.ErrGitCheckoutFailed, fmt.Sprintf("Error switching branch in %s", repo.Path), err)
 		}
 	}
 }
@@ -167,7 +168,7 @@ func SwitchBranchesParallel(repositories []config.Repository, branches []string)
 			defer wg.Done()
 			err := SwitchBranchWithFallback(r.Path, branches)
 			if err != nil {
-				fmt.Printf("Error switching branch in %s: %v\n", r.Path, err)
+				log.PrintErrorNoExit(log.ErrGitCheckoutFailed, fmt.Sprintf("Error switching branch in %s", r.Path), err)
 			}
 		}(repo)
 	}
@@ -176,58 +177,76 @@ func SwitchBranchesParallel(repositories []config.Repository, branches []string)
 }
 
 // SwitchBranchWithFallbackAndStash tries to switch to each branch in the given order, stashing changes if requested
-func SwitchBranchWithFallbackAndStash(repoPath string, branches []string, stashName string) error {
+func SwitchBranchWithFallbackAndStash(repoPath string, branches []string, stashName string) (bool, error) {
+	wasStashed := false
 	// If stashName is not empty, stash changes first
 	if stashName != "" {
 		err := StashChanges(repoPath, stashName)
 		if err != nil {
-			return fmt.Errorf("failed to stash changes: %v", err)
+			return false, fmt.Errorf("failed to stash changes: %v", err)
 		}
+		wasStashed = true
 	}
-	
+
 	// Proceed with normal branch switching
-	return SwitchBranchWithFallback(repoPath, branches)
+	return wasStashed, SwitchBranchWithFallback(repoPath, branches)
 }
 
 // SwitchBranchesSequentialWithStash switches branches in the provided repositories sequentially, with optional stashing
-func SwitchBranchesSequentialWithStash(repositories []config.Repository, branches []string, stashName string) {
+func SwitchBranchesSequentialWithStash(repositories []config.Repository, branches []string, stashName string) map[string]bool {
+	stashedRepos := make(map[string]bool)
+
 	for _, repo := range repositories {
 		var err error
 		if stashName != "" {
-			err = SwitchBranchWithFallbackAndStash(repo.Path, branches, stashName)
+			wasStashed, err := SwitchBranchWithFallbackAndStash(repo.Path, branches, stashName)
+			if err == nil && wasStashed {
+				stashedRepos[repo.Path] = true
+			}
 		} else {
 			err = SwitchBranchWithFallback(repo.Path, branches)
 		}
-		
+
 		if err != nil {
-			fmt.Printf("Error switching branch in %s: %v\n", repo.Path, err)
+			log.PrintErrorNoExit(log.ErrGitCheckoutFailed, fmt.Sprintf("Error switching branch in %s", repo.Path), err)
 		}
 	}
+
+	return stashedRepos
 }
 
 // SwitchBranchesParallelWithStash switches branches in the provided repositories in parallel, with optional stashing
-func SwitchBranchesParallelWithStash(repositories []config.Repository, branches []string, stashName string) {
+func SwitchBranchesParallelWithStash(repositories []config.Repository, branches []string, stashName string) map[string]bool {
 	var wg sync.WaitGroup
+	var mutex sync.Mutex // Mutex to protect the stashedRepos map from concurrent writes
+	stashedRepos := make(map[string]bool)
+
 	wg.Add(len(repositories))
 
 	for _, repo := range repositories {
 		go func(r config.Repository) {
 			defer wg.Done()
-			
+
 			var err error
 			if stashName != "" {
-				err = SwitchBranchWithFallbackAndStash(r.Path, branches, stashName)
+				wasStashed, err := SwitchBranchWithFallbackAndStash(r.Path, branches, stashName)
+				if err == nil && wasStashed {
+					mutex.Lock()
+					stashedRepos[r.Path] = true
+					mutex.Unlock()
+				}
 			} else {
 				err = SwitchBranchWithFallback(r.Path, branches)
 			}
-			
+
 			if err != nil {
-				fmt.Printf("Error switching branch in %s: %v\n", r.Path, err)
+				log.PrintErrorNoExit(log.ErrGitCheckoutFailed, fmt.Sprintf("Error switching branch in %s", r.Path), err)
 			}
 		}(repo)
 	}
 
 	wg.Wait()
+	return stashedRepos
 }
 
 // SwitchToBranch switches to a specific branch in a repository
@@ -255,26 +274,26 @@ func SwitchToBranch(repoPath string, branch string) error {
 		if err != nil {
 			return fmt.Errorf("git checkout failed for branch %s: %v\n%s", branch, err, output)
 		}
-		fmt.Printf("Successfully switched to branch %s in %s\n", branch, repoPath)
+		log.PrintSuccess(fmt.Sprintf("Successfully switched to branch %s in %s", branch, repoPath))
 		return nil
 	}
 
 	// If branch doesn't exist locally, try to find and check it out from remote
-	fmt.Printf("Branch %s not found locally in %s, checking remote...\n", branch, repoPath)
-	
+	log.PrintInfo(fmt.Sprintf("Branch %s not found locally in %s, checking remote...", branch, repoPath))
+
 	// Fetch from remote
 	fetchCmd := exec.Command("git", "-C", absPath, "fetch")
 	fetchOutput, err := fetchCmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("git fetch failed: %v\n%s", err, fetchOutput)
 	}
-	
+
 	// Check if remote branch exists
 	remoteBranchExists, err := CheckRemoteBranchExists(absPath, branch)
 	if err != nil {
 		return fmt.Errorf("failed to check if remote branch %s exists: %v", branch, err)
 	}
-	
+
 	if remoteBranchExists {
 		// Create tracking branch
 		trackCmd := exec.Command("git", "-C", absPath, "checkout", "-b", branch, "--track", "origin/"+branch)
@@ -287,7 +306,7 @@ func SwitchToBranch(repoPath string, branch string) error {
 				return fmt.Errorf("failed to checkout remote branch %s: %v\n%s", branch, err, checkoutOutput)
 			}
 		}
-		fmt.Printf("Successfully switched to branch %s in %s\n", branch, repoPath)
+		log.PrintSuccess(fmt.Sprintf("Successfully switched to branch %s in %s", branch, repoPath))
 		return nil
 	}
 
@@ -306,27 +325,27 @@ func SwitchBranch(repoPath string, branch string, stashChanges bool) error {
 	// Try to check out the branch directly first
 	cmd := exec.Command("git", "-C", repoPath, "checkout", branch)
 	if _, err := cmd.CombinedOutput(); err == nil {
-		fmt.Printf("Successfully switched to branch %s in %s\n", branch, repoPath)
+		log.PrintSuccess(fmt.Sprintf("Successfully switched to branch %s in %s", branch, repoPath))
 		return nil
 	} else {
 		// Branch doesn't exist locally, check if it exists remotely
-		fmt.Printf("Branch %s not found locally in %s, checking remote...\n", branch, repoPath)
-		
+		log.PrintInfo(fmt.Sprintf("Branch %s not found locally in %s, checking remote...", branch, repoPath))
+
 		// Fetch from remote to get latest branches
 		fetchCmd := exec.Command("git", "-C", repoPath, "fetch")
 		if _, err := fetchCmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("failed to fetch from remote: %v", err)
 		}
-		
+
 		// Check if the branch exists as a remote branch
 		lsRemoteCmd := exec.Command("git", "-C", repoPath, "ls-remote", "--heads", "origin", branch)
 		output, _ := lsRemoteCmd.CombinedOutput()
-		
+
 		if len(output) > 0 {
 			// Remote branch exists, check it out
 			checkoutCmd := exec.Command("git", "-C", repoPath, "checkout", "-b", branch, "--track", "origin/"+branch)
 			_, err := checkoutCmd.CombinedOutput()
-			
+
 			if err != nil {
 				// If that failed, maybe the branch already exists locally but is tracking a different remote
 				// Try a simple checkout with tracking
@@ -336,12 +355,12 @@ func SwitchBranch(repoPath string, branch string, stashChanges bool) error {
 					return fmt.Errorf("failed to checkout branch %s: %v\n%s", branch, err, string(output))
 				}
 			}
-			
-			fmt.Printf("Successfully switched to branch %s in %s\n", branch, repoPath)
+
+			log.PrintSuccess(fmt.Sprintf("Successfully switched to branch %s in %s", branch, repoPath))
 			return nil
 		} else {
 			// Branch doesn't exist remotely either
-			fmt.Printf("Branch %s not found locally or remotely in %s\n", branch, repoPath)
+			log.PrintWarning(fmt.Sprintf("Branch %s not found locally or remotely in %s", branch, repoPath))
 			return fmt.Errorf("branch %s not found locally or remotely", branch)
 		}
 	}

@@ -20,9 +20,9 @@ type RepositoryState struct {
 
 // BranchState represents a snapshot of all repositories at a specific time
 type BranchState struct {
-	Timestamp    string                      `yaml:"timestamp"`
-	Description  string                      `yaml:"description,omitempty"`
-	Repositories map[string]RepositoryState  `yaml:"repositories"`
+	Timestamp    string                     `yaml:"timestamp"`
+	Description  string                     `yaml:"description,omitempty"`
+	Repositories map[string]RepositoryState `yaml:"repositories"`
 }
 
 // BranchHistory stores the history of branch states
@@ -32,14 +32,36 @@ type BranchHistory struct {
 
 // GetHistoryFilePath returns the path to the branch history file
 func GetHistoryFilePath() (string, error) {
+	// First check for a history file in the current directory
+	currentDir, err := os.Getwd()
+	if err == nil {
+		currentDirHistoryPath := filepath.Join(currentDir, "git_cli_tool-history.yml")
+		if _, err := os.Stat(currentDirHistoryPath); err == nil {
+			// History file exists in current directory, use it
+			return currentDirHistoryPath, nil
+		}
+	}
+
 	// Get executable directory
 	exePath, err := os.Executable()
-	if (err != nil) {
+	if err != nil {
 		return "", fmt.Errorf("failed to get executable path: %v", err)
 	}
 	exeDir := filepath.Dir(exePath)
-	
-	// Use history file in the same directory as the executable
+
+	// Check if there's a history file in the executable directory
+	exeDirHistoryPath := filepath.Join(exeDir, "git_cli_tool-history.yml")
+	if _, err := os.Stat(exeDirHistoryPath); err == nil {
+		// History file exists in executable directory, use it
+		return exeDirHistoryPath, nil
+	}
+
+	// No existing history file found, default to creating one in the current directory
+	if currentDir != "" {
+		return filepath.Join(currentDir, "git_cli_tool-history.yml"), nil
+	}
+
+	// Fallback to executable directory if we can't get the current directory
 	return filepath.Join(exeDir, "git_cli_tool-history.yml"), nil
 }
 
@@ -115,12 +137,12 @@ func CreateBranchStateSnapshot(repositories []Repository, description string, st
 				branchName = strings.TrimSpace(string(cmdOut))
 			}
 		}
-		
+
 		stashName := ""
 		if stashNameByRepo != nil {
 			stashName = stashNameByRepo[repo.Path]
 		}
-		
+
 		state.Repositories[repo.Path] = RepositoryState{
 			Branch:    branchName,
 			StashName: stashName,

@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"git_cli_tool/log"
 )
 
 // StashChanges stashes changes in a repository with the given name
@@ -30,13 +32,13 @@ func StashChanges(repoPath string, stashName string) error {
 
 	// If there are no changes, skip stashing
 	if len(strings.TrimSpace(string(statusOutput))) == 0 {
-		fmt.Printf("No changes to stash in %s\n", repoPath)
+		log.PrintInfo(fmt.Sprintf("No changes to stash in %s", repoPath))
 		return nil
 	}
 
 	// Create a detailed message with the stash name
 	message := fmt.Sprintf("GitSwitch: %s", stashName)
-	
+
 	// Stash changes with the provided name, include untracked files
 	// Use --include-untracked to ensure all files are included, even new ones
 	stashCmd := exec.Command("git", "-C", absPath, "stash", "push", "--include-untracked", "-m", message)
@@ -45,10 +47,10 @@ func StashChanges(repoPath string, stashName string) error {
 		return fmt.Errorf("failed to stash changes: %v\n%s", err, stashOutput)
 	}
 
-	fmt.Printf("Successfully stashed changes in %s with message '%s'\n", repoPath, message)
-	fmt.Printf("To view stashed changes: git -C \"%s\" stash list\n", absPath)
-	fmt.Printf("To apply the stash: git -C \"%s\" stash apply\n", absPath)
-	
+	log.PrintSuccess(fmt.Sprintf("Successfully stashed changes in %s with message '%s'", repoPath, message))
+	log.PrintInfo(fmt.Sprintf("To view stashed changes: git -C \"%s\" stash list", absPath))
+	log.PrintInfo(fmt.Sprintf("To apply the stash: git -C \"%s\" stash apply", absPath))
+
 	return nil
 }
 
@@ -97,6 +99,6 @@ func ApplyStash(repoPath string, stashName string) error {
 		return fmt.Errorf("failed to apply stash %s: %v\n%s", stashIndex, err, applyOutput)
 	}
 
-	fmt.Printf("Successfully applied stash %s in %s\n", stashIndex, repoPath)
+	log.PrintSuccess(fmt.Sprintf("Successfully applied stash %s in %s", stashIndex, repoPath))
 	return nil
 }

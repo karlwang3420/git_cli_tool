@@ -7,7 +7,8 @@ import (
 
 	"git_cli_tool/config"
 	"git_cli_tool/git"
-	
+	"git_cli_tool/log"
+
 	"github.com/spf13/cobra"
 )
 
@@ -26,20 +27,20 @@ func initListCmd() {
 // runListCmd is the main function for the list command
 func runListCmd(cmd *cobra.Command, args []string) {
 	configObj, err := config.ReadConfig(configFile)
-	if (err != nil) {
-		fmt.Printf("Error reading config: %v\n", err)
+	if err != nil {
+		log.PrintError(log.ErrConfigReadFailed, "Error reading config", err)
 		os.Exit(1)
 	}
 
 	// Get the flattened repositories
 	repositories := configObj.FlattenRepositories()
 
-	fmt.Println("Configured repositories:")
-	fmt.Println("------------------------")
+	log.PrintInfo("Configured repositories:")
+	log.PrintInfo("------------------------")
 	for _, repo := range repositories {
 		currentBranch, err := git.GetCurrentBranch(repo.Path)
 		if err != nil {
-			fmt.Printf("- %s: Error - %v\n", repo.Path, err)
+			log.PrintErrorNoExit(log.ErrGitBranchNotFound, fmt.Sprintf("Error getting branch for %s", repo.Path), err)
 		} else {
 			preferredBranch := "none"
 			if len(configObj.Branches) > 0 {
@@ -49,16 +50,16 @@ func runListCmd(cmd *cobra.Command, args []string) {
 			if currentBranch != preferredBranch {
 				status = "✗"
 			}
-			fmt.Printf("- %s: Current: %s, Preferred: %s %s\n", 
-				repo.Path, 
-				currentBranch, 
+			log.PrintInfo(fmt.Sprintf("- %s: Current: %s, Preferred: %s %s",
+				repo.Path,
+				currentBranch,
 				preferredBranch,
-				status)
+				status))
 		}
 	}
-	
-	fmt.Println("\nBranch priority order:")
+
+	log.PrintInfo("\nBranch priority order:")
 	for i, branch := range configObj.Branches {
-		fmt.Printf("%d. %s\n", i+1, branch)
+		log.PrintInfo(fmt.Sprintf("%d. %s", i+1, branch))
 	}
 }

@@ -1,12 +1,12 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 
 	"git_cli_tool/config"
 	"git_cli_tool/git"
-	
+	"git_cli_tool/log"
+
 	"github.com/spf13/cobra"
 )
 
@@ -32,25 +32,25 @@ func initPullCmd() {
 func runPullCmd(cmd *cobra.Command, args []string) {
 	configObj, err := config.ReadConfig(configFile)
 	if err != nil {
-		fmt.Printf("Error reading config: %v\n", err)
+		log.PrintError(log.ErrConfigReadFailed, "Error reading config", err)
 		os.Exit(1)
 	}
 
 	// Get the flattened repositories
 	repositories := configObj.FlattenRepositories()
-	
+
 	if len(repositories) == 0 {
-		fmt.Println("No repositories found in the configuration file.")
+		log.PrintError(log.ErrNoConfigRepos, "No repositories found in the configuration file", nil)
 		os.Exit(1)
 	}
 
-	fmt.Println("Pulling latest changes from remote repositories...")
-	
+	log.PrintOperation("Pulling latest changes from remote repositories")
+
 	if parallel {
 		git.PullRepositoriesParallel(repositories)
 	} else {
 		git.PullRepositoriesSequential(repositories)
 	}
-	
-	fmt.Println("Pull operation completed.")
+
+	log.PrintSuccess("Pull operation completed")
 }

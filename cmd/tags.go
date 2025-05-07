@@ -2,12 +2,12 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 
 	"git_cli_tool/config"
 	"git_cli_tool/git"
-	
+	"git_cli_tool/log"
+
 	"github.com/spf13/cobra"
 )
 
@@ -29,25 +29,25 @@ func runTagsCmd(cmd *cobra.Command, args []string) {
 	// Read the configuration file
 	configObj, err := config.ReadConfig(configFile)
 	if err != nil {
-		fmt.Printf("Error reading config: %v\n", err)
+		log.PrintError(log.ErrConfigReadFailed, "Error reading config", err)
 		os.Exit(1)
 	}
 
 	// Get the flattened repositories
 	repositories := configObj.FlattenRepositories()
-	
+
 	if len(repositories) == 0 {
-		fmt.Println("No repositories found in the configuration file.")
+		log.PrintError(log.ErrNoConfigRepos, "No repositories found in the configuration file", nil)
 		os.Exit(1)
 	}
 
-	fmt.Println("Refreshing tags in all repositories...")
-	
+	log.PrintOperation("Refreshing tags in all repositories")
+
 	if parallel {
 		git.ProcessTagsParallel(repositories)
 	} else {
 		git.ProcessTagsSequential(repositories)
 	}
-	
-	fmt.Println("Tags refresh completed.")
+
+	log.PrintSuccess("Tags refresh completed")
 }

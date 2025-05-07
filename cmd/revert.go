@@ -2,13 +2,13 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 
 	"git_cli_tool/config"
 	"git_cli_tool/git"
-	
+	"git_cli_tool/log"
+
 	"github.com/spf13/cobra"
 )
 
@@ -34,42 +34,43 @@ func runRevertCmd(cmd *cobra.Command, args []string) {
 	// Parse the history index argument
 	index, err := strconv.Atoi(args[0])
 	if err != nil {
-		fmt.Printf("Error parsing index: %v\n", err)
+		log.PrintError(log.ErrInvalidArgument, "Error parsing index", err)
 		os.Exit(1)
 	}
-	
+
 	history, err := config.LoadBranchHistory()
 	if err != nil {
-		fmt.Printf("Error loading branch history: %v\n", err)
+		log.PrintError(log.ErrHistoryReadFailed, "Error loading branch history", err)
 		os.Exit(1)
 	}
-	
+
 	if len(history.States) == 0 {
-		fmt.Println("No branch history found.")
+		log.PrintInfo("No branch history found.")
 		return
 	}
-	
+
 	// Convert the user-provided index to the actual array index
 	// User sees newest first (index 0), but array stores oldest first
 	actualIndex := len(history.States) - 1 - index
-	
+
 	if actualIndex < 0 || actualIndex >= len(history.States) {
-		fmt.Printf("Invalid index: %d (valid range: 0-%d)\n", index, len(history.States)-1)
+		log.PrintError(log.ErrHistoryIndexInvalid, "Invalid index", nil)
+		log.PrintInfo("Valid range: 0-" + strconv.Itoa(len(history.States)-1))
 		os.Exit(1)
 	}
-	
+
 	// Get the state to revert to
 	state := history.States[actualIndex]
-	
+
 	// Revert to the selected state
 	err = git.RevertToState(state, applyStashes)
 	if err != nil {
-		fmt.Printf("Error during revert: %v\n", err)
+		log.PrintError(log.ErrOperationFailed, "Error during revert", err)
 		os.Exit(1)
 	}
-	
-	fmt.Printf("Successfully reverted to state [%d] from %s\n", index, state.Timestamp)
+
+	log.PrintSuccess("Successfully reverted to state [" + strconv.Itoa(index) + "] from " + state.Timestamp)
 	if state.Description != "" {
-		fmt.Printf("Description: %s\n", state.Description)
+		log.PrintInfo("Description: " + state.Description)
 	}
 }

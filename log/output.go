@@ -15,14 +15,9 @@ func FormatSuccess(message string) string {
 	return fmt.Sprintf("[SUCCESS] %s", message)
 }
 
-// FormatInfo formats an info message with a consistent structure
-func FormatInfo(message string) string {
-	return fmt.Sprintf("[INFO] %s", message)
-}
-
-// FormatOperation formats an operation message with a consistent structure
-func FormatOperation(message string) string {
-	return fmt.Sprintf("[OPERATION] %s...", message)
+// FormatDebug formats a debug message with a consistent structure
+func FormatDebug(message string) string {
+	return fmt.Sprintf("[DEBUG] %s", message)
 }
 
 // PrintError prints an error message with the appropriate error code and exits with code 1
@@ -48,12 +43,17 @@ func PrintSuccess(message string) {
 
 // PrintInfo prints an info message
 func PrintInfo(message string) {
-	fmt.Println(FormatInfo(message))
+	fmt.Println((message))
 }
 
 // PrintOperation prints a message about an operation being performed
 func PrintOperation(operation string) {
-	fmt.Println(FormatOperation(operation))
+	fmt.Println((operation))
+}
+
+// PrintDebug prints a debug message
+func PrintDebug(message string) {
+	fmt.Fprintln(os.Stderr, FormatDebug(message))
 }
 
 // PrintOperationResult prints the result of an operation
