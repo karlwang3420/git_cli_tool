@@ -40,7 +40,7 @@ func RunGitCommand(repoPath string, args ...string) (string, error) {
 }
 
 // RevertToState reverts all repositories to the state described in the history
-func RevertToState(state config.HistoryState) error {
+func RevertToState(state config.BranchState, applyStashes bool) error {
 	fmt.Printf("Reverting to branch state from %s\n", state.Timestamp)
 	
 	if state.Description != "" {
@@ -62,9 +62,9 @@ func RevertToState(state config.HistoryState) error {
 			continue
 		}
 		
-		// If there was a stash recorded, try to apply it
-		if branchInfo.Stash != "" {
-			err = ApplyStash(repoPath, branchInfo.Stash)
+		// If there was a stash recorded and applyStashes is true, try to apply it
+		if branchInfo.StashName != "" && applyStashes {
+			err = ApplyStash(repoPath, branchInfo.StashName)
 			if err != nil {
 				fmt.Printf("Error applying stash in %s: %v\n", repoPath, err)
 			}

@@ -4,13 +4,12 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
-	"sync"
+	"time"
 
 	"git_cli_tool/config"
 	"git_cli_tool/git"
-	
+
 	"github.com/spf13/cobra"
 )
 
@@ -65,7 +64,7 @@ func runSwitchCmd(cmd *cobra.Command, args []string) {
 	}
 
 	// If recording history is enabled, save the current state
-	if configObj.RecordHistory && !dryRun {
+	if configObj.RecordHistory {
 		_, history, err := config.ReadHistory()
 		if err == nil || os.IsNotExist(err) {
 			// Attempt to save the current state
@@ -79,38 +78,26 @@ func runSwitchCmd(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	description := description
-	stashName := stashName
-	
+	description := historyDescription
+	stashName := autostash
+	stash := autostash != ""
+
 	// If no description was provided, use generic one
 	if description == "" {
 		description = fmt.Sprintf("Manual switch to %s", strings.Join(branches, ", "))
 	}
-	
+
 	// If no stashName was provided, use first branch name
 	if stash && stashName == "" && len(branches) > 0 {
 		stashName = branches[0]
 	}
 
-	// If it's a dry run, just print what would happen
-	if dryRun {
-		fmt.Println("Dry run: Showing branch switching plan (not executing)")
-		fmt.Printf("Would switch repositories to branches: %s\n", strings.Join(branches, ", "))
-		if stash {
-			fmt.Printf("Would stash changes with name: %s\n", stashName)
-		}
-		for _, repo := range repositories {
-			fmt.Printf("Would process repository: %s\n", repo.Path)
-		}
-		return
-	}
-	
 	// Actually switch branches now
 	fmt.Printf("Switching repositories to branches: %s\n", strings.Join(branches, ", "))
-	
+
 	// If stashing, remember which repositories had changes stashed
 	stashedRepos := make(map[string]bool)
-	
+
 	// Perform the branch switching
 	if parallel {
 		if stash {
@@ -125,9 +112,9 @@ func runSwitchCmd(cmd *cobra.Command, args []string) {
 			git.SwitchBranchesSequential(repositories, branches)
 		}
 	}
-	
+
 	fmt.Println("Branch switch completed.")
-	
+
 	// If recording history, save the post-switch state with stash information
 	if configObj.RecordHistory && stash {
 		_, history, err := config.ReadHistory()
@@ -142,4 +129,57 @@ func runSwitchCmd(cmd *cobra.Command, args []string) {
 			}
 		}
 	}
+}
+
+// collectCurrentState collects the current branch state of all repositories
+func collectCurrentState(repositories []config.Repository) (*config.BranchState, error) {
+	state := &config.BranchState{
+		Timestamp:    time.Now().Format(time.RFC3339),
+		Description:  historyDescription,
+		Repositories: make(map[string]config.RepositoryState),
+	}
+
+	for _, repo := range repositories {
+		currentBranch, err := git.GetCurrentBranch(repo.Path)
+		if err != nil {
+			fmt.Printf("Warning: Could not get current branch for %s: %v\n", repo.Path, err)
+			continue
+		}
+
+		state.Repositories[repo.Path] = config.RepositoryState{
+			Branch:    currentBranch,
+			StashName: "",
+		}
+	}
+
+	return state, nil
+}
+
+// collectPostSwitchState collects the post-switch branch state with stash information
+func collectPostSwitchState(repositories []config.Repository, stashName string, stashedRepos map[string]bool) (*config.BranchState, error) {
+	state := &config.BranchState{
+		Timestamp:    time.Now().Format(time.RFC3339),
+		Repositories: make(map[string]config.RepositoryState),
+	}
+
+	for _, repo := range repositories {
+		currentBranch, err := git.GetCurrentBranch(repo.Path)
+		if err != nil {
+			fmt.Printf("Warning: Could not get current branch for %s: %v\n", repo.Path, err)
+			continue
+		}
+
+		repoStashName := ""
+		// If this repository had changes stashed, record the stash name
+		if stashedRepos[repo.Path] || stashName != "" {
+			repoStashName = stashName
+		}
+
+		state.Repositories[repo.Path] = config.RepositoryState{
+			Branch:    currentBranch,
+			StashName: repoStashName,
+		}
+	}
+
+	return state, nil
 }

@@ -11,8 +11,10 @@ import (
 
 // Configuration represents the YAML configuration file structure
 type Configuration struct {
-	Branches     []string                 `yaml:"branches"`
-	Repositories []map[string][]string    `yaml:"repositories"`
+	Branches        []string                 `yaml:"branches"`
+	DefaultBranches []string                 `yaml:"branches"` // Alias for Branches for backwards compatibility
+	RecordHistory   bool                     `yaml:"record_history,omitempty"`
+	Repositories    []map[string][]string    `yaml:"repositories"`
 }
 
 // Repository represents a Git repository configuration

@@ -144,6 +144,26 @@ func CreateBranchStateSnapshot(repositories []Repository, description string, st
 	return &state, nil
 }
 
+// SaveStateToHistory adds a branch state to history and saves it to file
+func SaveStateToHistory(state *BranchState, history *BranchHistory) error {
+	// Add the new state to history
+	history.States = append(history.States, *state)
+
+	// Save the updated history
+	return SaveBranchHistory(history)
+}
+
+// ReadHistory loads the branch history from file
+func ReadHistory() (string, *BranchHistory, error) {
+	historyPath, err := GetHistoryFilePath()
+	if err != nil {
+		return "", nil, err
+	}
+
+	history, err := LoadBranchHistory()
+	return historyPath, history, err
+}
+
 // Helper function to execute commands
 func execCommand(command string, args ...string) ([]byte, error) {
 	cmd := exec.Command(command, args...)
