@@ -104,28 +104,56 @@ func runSwitchCmd(cmd *cobra.Command, args []string) {
 
 	// Actually switch branches now
 	log.PrintOperation("Switching repositories to branches: " + strings.Join(branches, ", "))
+	log.PrintInfo("")
 
 	// If stashing, remember which repositories had changes stashed
 	stashedRepos := make(map[string]bool)
 
 	// Perform the branch switching
-	if parallel {
-		if stash {
+	if stash {
+		// Use old method for stash (keeps inline stash logging)
+		if parallel {
 			stashedRepos = git.SwitchBranchesParallelWithStash(repositories, branches, stashName)
-			log.PrintDebug(fmt.Sprintf("Stashed repositories (parallel): %v", stashedRepos))
 		} else {
-			git.SwitchBranchesParallel(repositories, branches)
-		}
-	} else {
-		if stash {
 			stashedRepos = git.SwitchBranchesSequentialWithStash(repositories, branches, stashName)
-			log.PrintDebug(fmt.Sprintf("Stashed repositories (sequential): %v", stashedRepos))
+		}
+		_ = stashedRepos // used for history if needed
+		log.PrintInfo("")
+		log.PrintSuccess("Branch switch completed")
+	} else {
+		// Use new method with nice aligned output
+		results := git.SwitchBranchesWithResults(repositories, branches)
+		printSwitchResults(results)
+	}
+}
+
+// printSwitchResults displays switch results in a nice aligned format
+func printSwitchResults(results []git.SwitchResult) {
+	successCount := 0
+	failCount := 0
+
+	for _, r := range results {
+		if r.Success {
+			successCount++
+			if r.AlreadyOnIt {
+				log.PrintSuccess(fmt.Sprintf("%-30s %s → [ALREADY ON TARGET]", r.RepoName, r.ToBranch))
+			} else if r.FromRemote {
+				log.PrintInfo(fmt.Sprintf("%-30s %s → %s (from remote)", r.RepoName, r.FromBranch, r.ToBranch))
+			} else {
+				log.PrintInfo(fmt.Sprintf("%-30s %s → %s", r.RepoName, r.FromBranch, r.ToBranch))
+			}
 		} else {
-			git.SwitchBranchesSequential(repositories, branches)
+			failCount++
+			log.PrintWarning(fmt.Sprintf("%-30s %s → [FAILED: %s]", r.RepoName, r.FromBranch, r.Message))
 		}
 	}
 
-	log.PrintSuccess("Branch switch completed")
+	log.PrintInfo("")
+	if failCount == 0 {
+		log.PrintSuccess(fmt.Sprintf("All %d repositories switched successfully!", successCount))
+	} else {
+		log.PrintWarning(fmt.Sprintf("%d succeeded, %d failed", successCount, failCount))
+	}
 }
 
 // collectCurrentState collects the current branch state of all repositories

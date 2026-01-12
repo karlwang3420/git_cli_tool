@@ -13,6 +13,19 @@ import (
 	"git_cli_tool/log"
 )
 
+// SwitchResult holds the result of switching a branch in a repository
+type SwitchResult struct {
+	RepoPath     string
+	RepoName     string
+	FromBranch   string
+	ToBranch     string
+	Success      bool
+	Message      string
+	FromRemote   bool
+	AlreadyOnIt  bool
+}
+
+
 // GetCurrentBranch gets the current branch name of the repository
 func GetCurrentBranch(repoPath string) (string, error) {
 	absPath, err := filepath.Abs(repoPath)
@@ -146,6 +159,100 @@ func SwitchBranchWithFallback(repoPath string, branches []string) error {
 		return fmt.Errorf("failed to switch to any branch in repository %s: %v", repoPath, lastError)
 	}
 	return fmt.Errorf("none of the specified branches exist in repository %s", repoPath)
+}
+
+// SwitchBranchWithResult switches to a branch and returns the result (no logging)
+func SwitchBranchWithResult(repoPath string, branches []string) SwitchResult {
+	absPath, err := filepath.Abs(repoPath)
+	repoName := filepath.Base(repoPath)
+	
+	result := SwitchResult{
+		RepoPath: repoPath,
+		RepoName: repoName,
+	}
+
+	if err != nil {
+		result.Message = "failed to resolve path"
+		return result
+	}
+
+	// Check if repository exists
+	if _, err := os.Stat(filepath.Join(absPath, ".git")); os.IsNotExist(err) {
+		result.Message = "not a git repository"
+		return result
+	}
+
+	// Get current branch
+	result.FromBranch, _ = GetCurrentBranch(absPath)
+
+	// Try each branch in order
+	for _, branch := range branches {
+		// Check if already on this branch
+		if result.FromBranch == branch {
+			result.ToBranch = branch
+			result.Success = true
+			result.AlreadyOnIt = true
+			result.Message = "already on target"
+			return result
+		}
+
+		// Check if branch exists locally
+		branchExists, err := CheckBranchExists(absPath, branch)
+		if err != nil {
+			continue
+		}
+
+		if branchExists {
+			cmd := exec.Command("git", "-C", absPath, "checkout", branch)
+			_, err := cmd.CombinedOutput()
+			if err != nil {
+				continue
+			}
+			result.ToBranch = branch
+			result.Success = true
+			result.Message = "switched"
+			return result
+		}
+
+		// Try to fetch and check remote
+		fetchCmd := exec.Command("git", "-C", absPath, "fetch")
+		fetchCmd.CombinedOutput()
+
+		remoteBranchExists, err := CheckRemoteBranchExists(absPath, branch)
+		if err != nil || !remoteBranchExists {
+			continue
+		}
+
+		// Create tracking branch
+		trackCmd := exec.Command("git", "-C", absPath, "checkout", "-b", branch, "--track", "origin/"+branch)
+		_, err = trackCmd.CombinedOutput()
+		if err != nil {
+			// Try direct checkout
+			checkoutCmd := exec.Command("git", "-C", absPath, "checkout", branch)
+			_, err = checkoutCmd.CombinedOutput()
+			if err != nil {
+				continue
+			}
+		}
+		result.ToBranch = branch
+		result.Success = true
+		result.FromRemote = true
+		result.Message = "switched (from remote)"
+		return result
+	}
+
+	result.Message = fmt.Sprintf("no matching branch found")
+	return result
+}
+
+// SwitchBranchesWithResults switches branches and returns results for aligned display
+func SwitchBranchesWithResults(repositories []config.Repository, branches []string) []SwitchResult {
+	var results []SwitchResult
+	for _, repo := range repositories {
+		result := SwitchBranchWithResult(repo.Path, branches)
+		results = append(results, result)
+	}
+	return results
 }
 
 // SwitchBranchesSequential switches branches in the provided repositories sequentially

@@ -12,6 +12,12 @@ import (
 // PullRepositoriesSequential pulls the latest changes from remote in each repository sequentially
 func PullRepositoriesSequential(repositories []config.Repository) {
 	for _, repo := range repositories {
+		// Sync tags before pulling
+		log.PrintOperation(fmt.Sprintf("Syncing tags in %s", repo.Path))
+		if err := SyncTags(repo.Path); err != nil {
+			log.PrintErrorNoExit(log.ErrGitTagOperationFailed, fmt.Sprintf("Error syncing tags in %s", repo.Path), err)
+		}
+
 		log.PrintOperation(fmt.Sprintf("Pulling in %s", repo.Path))
 		cmd := exec.Command("git", "-C", repo.Path, "pull")
 		output, err := cmd.CombinedOutput()
@@ -37,6 +43,13 @@ func PullRepositoriesParallel(repositories []config.Repository) {
 	for _, repo := range repositories {
 		go func(r config.Repository) {
 			defer wg.Done()
+
+			// Sync tags before pulling
+			if err := SyncTags(r.Path); err != nil {
+				outputMutex.Lock()
+				log.PrintErrorNoExit(log.ErrGitTagOperationFailed, fmt.Sprintf("Error syncing tags in %s", r.Path), err)
+				outputMutex.Unlock()
+			}
 
 			cmd := exec.Command("git", "-C", r.Path, "pull")
 			output, err := cmd.CombinedOutput()
