@@ -11,29 +11,31 @@ import (
 	"git_cli_tool/log"
 )
 
-// StashChanges stashes changes in a repository with the given name
-func StashChanges(repoPath string, stashName string) error {
+// StashChanges stashes changes in a repository with the given name.
+// Returns (true, nil) if changes were stashed, (false, nil) if no changes to stash,
+// or (false, error) if an error occurred.
+func StashChanges(repoPath string, stashName string) (bool, error) {
 	absPath, err := filepath.Abs(repoPath)
 	if err != nil {
-		return fmt.Errorf("failed to resolve absolute path: %v", err)
+		return false, fmt.Errorf("failed to resolve absolute path: %v", err)
 	}
 
 	// Check if repository exists
 	if _, err := os.Stat(filepath.Join(absPath, ".git")); os.IsNotExist(err) {
-		return fmt.Errorf("not a git repository or directory does not exist")
+		return false, fmt.Errorf("not a git repository or directory does not exist")
 	}
 
 	// Check if there are changes to stash
 	statusCmd := exec.Command("git", "-C", absPath, "status", "--porcelain")
 	statusOutput, err := statusCmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to get git status: %v", err)
+		return false, fmt.Errorf("failed to get git status: %v", err)
 	}
 
 	// If there are no changes, skip stashing
 	if len(strings.TrimSpace(string(statusOutput))) == 0 {
 		log.PrintInfo(fmt.Sprintf("No changes to stash in %s", repoPath))
-		return nil
+		return false, nil
 	}
 
 	// Create a detailed message with the stash name
@@ -44,14 +46,14 @@ func StashChanges(repoPath string, stashName string) error {
 	stashCmd := exec.Command("git", "-C", absPath, "stash", "push", "--include-untracked", "-m", message)
 	stashOutput, err := stashCmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to stash changes: %v\n%s", err, stashOutput)
+		return false, fmt.Errorf("failed to stash changes: %v\n%s", err, stashOutput)
 	}
 
 	log.PrintSuccess(fmt.Sprintf("Successfully stashed changes in %s with message '%s'", repoPath, message))
 	log.PrintInfo(fmt.Sprintf("To view stashed changes: git -C \"%s\" stash list", absPath))
 	log.PrintInfo(fmt.Sprintf("To apply the stash: git -C \"%s\" stash apply", absPath))
 
-	return nil
+	return true, nil
 }
 
 // ApplyStash applies a specific stash in a repository

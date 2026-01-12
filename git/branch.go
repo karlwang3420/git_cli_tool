@@ -181,11 +181,11 @@ func SwitchBranchWithFallbackAndStash(repoPath string, branches []string, stashN
 	wasStashed := false
 	// If stashName is not empty, stash changes first
 	if stashName != "" {
-		err := StashChanges(repoPath, stashName)
+		var err error
+		wasStashed, err = StashChanges(repoPath, stashName)
 		if err != nil {
 			return false, fmt.Errorf("failed to stash changes: %v", err)
 		}
-		wasStashed = true
 	}
 
 	// Proceed with normal branch switching
@@ -199,7 +199,8 @@ func SwitchBranchesSequentialWithStash(repositories []config.Repository, branche
 	for _, repo := range repositories {
 		var err error
 		if stashName != "" {
-			wasStashed, err := SwitchBranchWithFallbackAndStash(repo.Path, branches, stashName)
+			var wasStashed bool
+			wasStashed, err = SwitchBranchWithFallbackAndStash(repo.Path, branches, stashName)
 			if err == nil && wasStashed {
 				stashedRepos[repo.Path] = true
 			}
@@ -229,7 +230,8 @@ func SwitchBranchesParallelWithStash(repositories []config.Repository, branches 
 
 			var err error
 			if stashName != "" {
-				wasStashed, err := SwitchBranchWithFallbackAndStash(r.Path, branches, stashName)
+				var wasStashed bool
+				wasStashed, err = SwitchBranchWithFallbackAndStash(r.Path, branches, stashName)
 				if err == nil && wasStashed {
 					mutex.Lock()
 					stashedRepos[r.Path] = true
@@ -317,7 +319,7 @@ func SwitchToBranch(repoPath string, branch string) error {
 func SwitchBranch(repoPath string, branch string, stashChanges bool) error {
 	// Check if we need to stash changes
 	if stashChanges {
-		if err := StashChanges(repoPath, branch); err != nil {
+		if _, err := StashChanges(repoPath, branch); err != nil {
 			return fmt.Errorf("failed to stash changes: %v", err)
 		}
 	}
