@@ -121,38 +121,66 @@ func runSwitchCmd(cmd *cobra.Command, args []string) {
 		log.PrintInfo("")
 		log.PrintSuccess("Branch switch completed")
 	} else {
-		// Use new method with nice aligned output
-		results := git.SwitchBranchesWithResults(repositories, branches)
-		printSwitchResults(results)
-	}
-}
+		// Process with real-time output
+		successCount := 0
+		failCount := 0
 
-// printSwitchResults displays switch results in a nice aligned format
-func printSwitchResults(results []git.SwitchResult) {
-	successCount := 0
-	failCount := 0
+		if parallel {
+			// Parallel execution with channel for results
+			resultsChan := make(chan git.SwitchResult, len(repositories))
+			
+			// Launch goroutines
+			for _, repo := range repositories {
+				go func(r config.Repository) {
+					resultsChan <- git.SwitchBranchWithResult(r.Path, branches)
+				}(repo)
+			}
 
-	for _, r := range results {
-		if r.Success {
-			successCount++
-			if r.AlreadyOnIt {
-				log.PrintSuccess(fmt.Sprintf("%-30s %s → [ALREADY ON TARGET]", r.RepoName, r.ToBranch))
-			} else if r.FromRemote {
-				log.PrintInfo(fmt.Sprintf("%-30s %s → %s (from remote)", r.RepoName, r.FromBranch, r.ToBranch))
-			} else {
-				log.PrintInfo(fmt.Sprintf("%-30s %s → %s", r.RepoName, r.FromBranch, r.ToBranch))
+			// Collect results as they come in
+			for i := 0; i < len(repositories); i++ {
+				result := <-resultsChan
+				
+				if result.Success {
+					successCount++
+					if result.AlreadyOnIt {
+						log.PrintSuccess(fmt.Sprintf("%-30s %s → [ALREADY ON TARGET]", result.RepoName, result.ToBranch))
+					} else if result.FromRemote {
+						log.PrintInfo(fmt.Sprintf("%-30s %s → %s (from remote)", result.RepoName, result.FromBranch, result.ToBranch))
+					} else {
+						log.PrintInfo(fmt.Sprintf("%-30s %s → %s", result.RepoName, result.FromBranch, result.ToBranch))
+					}
+				} else {
+					failCount++
+					log.PrintWarning(fmt.Sprintf("%-30s %s → [FAILED: %s]", result.RepoName, result.FromBranch, result.Message))
+				}
 			}
 		} else {
-			failCount++
-			log.PrintWarning(fmt.Sprintf("%-30s %s → [FAILED: %s]", r.RepoName, r.FromBranch, r.Message))
+			// Sequential execution
+			for _, repo := range repositories {
+				result := git.SwitchBranchWithResult(repo.Path, branches)
+				
+				if result.Success {
+					successCount++
+					if result.AlreadyOnIt {
+						log.PrintSuccess(fmt.Sprintf("%-30s %s → [ALREADY ON TARGET]", result.RepoName, result.ToBranch))
+					} else if result.FromRemote {
+						log.PrintInfo(fmt.Sprintf("%-30s %s → %s (from remote)", result.RepoName, result.FromBranch, result.ToBranch))
+					} else {
+						log.PrintInfo(fmt.Sprintf("%-30s %s → %s", result.RepoName, result.FromBranch, result.ToBranch))
+					}
+				} else {
+					failCount++
+					log.PrintWarning(fmt.Sprintf("%-30s %s → [FAILED: %s]", result.RepoName, result.FromBranch, result.Message))
+				}
+			}
 		}
-	}
 
-	log.PrintInfo("")
-	if failCount == 0 {
-		log.PrintSuccess(fmt.Sprintf("All %d repositories switched successfully!", successCount))
-	} else {
-		log.PrintWarning(fmt.Sprintf("%d succeeded, %d failed", successCount, failCount))
+		log.PrintInfo("")
+		if failCount == 0 {
+			log.PrintSuccess(fmt.Sprintf("All %d repositories switched successfully!", successCount))
+		} else {
+			log.PrintWarning(fmt.Sprintf("%d succeeded, %d failed", successCount, failCount))
+		}
 	}
 }
 
