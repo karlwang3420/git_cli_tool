@@ -19,8 +19,8 @@ var (
 // revertCmd represents the revert command
 var revertCmd = &cobra.Command{
 	Use:   "revert [index]",
-	Short: "Revert to a previous branch state",
-	Args:  cobra.ExactArgs(1),
+	Short: "Revert to a previous branch state (defaults to latest if no index provided)",
+	Args:  cobra.MaximumNArgs(1),
 	Run:   runRevertCmd,
 }
 
@@ -31,11 +31,15 @@ func initRevertCmd() {
 
 // runRevertCmd is the main function for the revert command
 func runRevertCmd(cmd *cobra.Command, args []string) {
-	// Parse the history index argument
-	index, err := strconv.Atoi(args[0])
-	if err != nil {
-		log.PrintError(log.ErrInvalidArgument, "Error parsing index", err)
-		os.Exit(1)
+	// Parse the history index argument, default to 0 (most recent) if not provided
+	index := 0
+	if len(args) > 0 {
+		var err error
+		index, err = strconv.Atoi(args[0])
+		if err != nil {
+			log.PrintError(log.ErrInvalidArgument, "Error parsing index", err)
+			os.Exit(1)
+		}
 	}
 
 	history, err := config.LoadBranchHistory()

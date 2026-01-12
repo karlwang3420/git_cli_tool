@@ -12,6 +12,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// MaxHistorySize is the maximum number of history entries to keep
+const MaxHistorySize = 50
+
 // RepositoryState represents the state of a repository at a specific time
 type RepositoryState struct {
 	Branch    string `yaml:"branch"`
@@ -98,6 +101,11 @@ func SaveBranchHistory(history *BranchHistory) error {
 	historyPath, err := GetHistoryFilePath()
 	if err != nil {
 		return err
+	}
+
+	// Trim history to keep only the most recent entries
+	if len(history.States) > MaxHistorySize {
+		history.States = history.States[len(history.States)-MaxHistorySize:]
 	}
 
 	// Marshal to YAML
