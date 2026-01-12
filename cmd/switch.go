@@ -79,14 +79,8 @@ func runSwitchCmd(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	description := historyDescription
 	stashName := autostash
 	stash := autostash != ""
-
-	// If no description was provided, use generic one
-	if description == "" {
-		description = "Manual switch to " + strings.Join(branches, ", ")
-	}
 
 	// If no stashName was provided, use first branch name
 	if stash && stashName == "" && len(branches) > 0 {
@@ -117,21 +111,6 @@ func runSwitchCmd(cmd *cobra.Command, args []string) {
 	}
 
 	log.PrintSuccess("Branch switch completed")
-
-	// If recording history is enabled, save the post-switch state
-	if configObj.RecordHistory {
-		_, history, err := config.ReadHistory()
-		if err == nil || os.IsNotExist(err) {
-			state, err := collectPostSwitchState(repositories, stashName, stashedRepos)
-			if err != nil {
-				log.PrintWarning("Error saving post-switch branch history: " + err.Error())
-			} else {
-				state.Description = description
-				config.SaveStateToHistory(state, history)
-				log.PrintSuccess("Post-switch branch state saved to history")
-			}
-		}
-	}
 }
 
 // collectCurrentState collects the current branch state of all repositories
@@ -152,35 +131,6 @@ func collectCurrentState(repositories []config.Repository) (*config.BranchState,
 		state.Repositories[repo.Path] = config.RepositoryState{
 			Branch:    currentBranch,
 			StashName: "",
-		}
-	}
-
-	return state, nil
-}
-
-// collectPostSwitchState collects the post-switch branch state with stash information
-func collectPostSwitchState(repositories []config.Repository, stashName string, stashedRepos map[string]bool) (*config.BranchState, error) {
-	state := &config.BranchState{
-		Timestamp:    time.Now().Format(time.RFC3339),
-		Repositories: make(map[string]config.RepositoryState),
-	}
-
-	for _, repo := range repositories {
-		currentBranch, err := git.GetCurrentBranch(repo.Path)
-		if err != nil {
-			log.PrintWarning("Could not get current branch for " + repo.Path + ": " + err.Error())
-			continue
-		}
-
-		repoStashName := ""
-		// Only record the stash name if this specific repository had changes stashed
-		if stashedRepos[repo.Path] {
-			repoStashName = stashName
-		}
-
-		state.Repositories[repo.Path] = config.RepositoryState{
-			Branch:    currentBranch,
-			StashName: repoStashName,
 		}
 	}
 
