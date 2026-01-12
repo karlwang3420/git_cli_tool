@@ -35,6 +35,7 @@ func Initialize() {
 	initRevertCmd()
 	initPullCmd()
 	initStatusCmd()
+	initSyncCmd()
 	
 	// Add commands to root command
 	rootCmd.AddCommand(switchCmd)
@@ -44,6 +45,7 @@ func Initialize() {
 	rootCmd.AddCommand(revertCmd)
 	rootCmd.AddCommand(pullCmd)
 	rootCmd.AddCommand(statusCmd)
+	rootCmd.AddCommand(syncCmd)
 }
 
 // Execute executes the root command

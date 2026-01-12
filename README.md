@@ -56,6 +56,14 @@ repositories:
   - "H:/code_base/project1/frontend":
       - "web-client"
       - "mobile-client"
+
+# Optional: Define branch dependencies for the sync command
+branch_dependencies:
+  "feature/extension": "feature/base"
+  "feature/part2": "feature/part1"
+
+# Optional: Fallback branch when parent is not found (default: main)
+fallback_branch: "main"
 ```
 
 In this configuration:
@@ -147,6 +155,23 @@ Preview what branches would be switched to without making changes (includes remo
 git_cli_tool switch --dry-run
 ```
 
+### Sync Branch with Parent
+
+Sync a branch with its parent branch across all repositories. This is useful when you have dependent branches that need to stay up-to-date with their parent:
+
+```
+git_cli_tool sync feature/extension
+```
+
+This will:
+
+1. Switch to `feature/extension` in each repository
+2. Look up the parent branch from `branch_dependencies` in your config
+3. Merge the parent branch into `feature/extension`
+4. If the parent branch doesn't exist, fall back to `main` (or your configured `fallback_branch`)
+
+The sync command handles merge conflicts gracefully - it will report which repositories had conflicts and abort the merge, leaving those repos in a clean state for manual resolution.
+
 ### Refresh Tags
 
 Delete all local tags and fetch the latest tags from remotes for all repositories:
@@ -222,6 +247,7 @@ The project has a modular structure for better organization:
   - `revert.go`: State restoration functionality
   - `pull.go`: Repository pull operations
   - `status.go`: Quick repository status overview
+  - `sync.go`: Branch dependency synchronization
 - `config/`: Configuration parsing and management
   - `config.go`: Core configuration loading
   - `history.go`: History tracking and state management

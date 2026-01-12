@@ -11,9 +11,11 @@ import (
 
 // Configuration represents the YAML configuration file structure
 type Configuration struct {
-	Branches      []string              `yaml:"branches"`
-	RecordHistory bool                  `yaml:"record_history,omitempty"`
-	Repositories  []map[string][]string `yaml:"repositories"`
+	Branches           []string              `yaml:"branches"`
+	RecordHistory      bool                  `yaml:"record_history,omitempty"`
+	Repositories       []map[string][]string `yaml:"repositories"`
+	BranchDependencies map[string]string     `yaml:"branch_dependencies,omitempty"` // child -> parent mapping
+	FallbackBranch     string                `yaml:"fallback_branch,omitempty"`     // default: "main"
 }
 
 // Repository represents a Git repository configuration
