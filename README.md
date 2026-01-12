@@ -16,18 +16,21 @@ A command-line tool that helps you efficiently manage branches across multiple G
 ## Installation
 
 ### Prerequisites
+
 - Go 1.16 or higher
 - Git installed and accessible from the command line
 
 ### Building from source
 
 1. Clone the repository
+
 ```
 git clone https://github.com/yourusername/gitswitch.git
 cd gitswitch
 ```
 
 2. Build the application
+
 ```
 go build -o git_cli_tool.exe
 ```
@@ -40,13 +43,13 @@ GitSwitch uses a YAML configuration file (`git_cli_tool.yml` by default) to defi
 
 ```yaml
 branches:
-  - "feature/new-feature"  # First priority branch
-  - "develop"              # Second priority (fallback)
-  - "main"                 # Third priority (last resort)
+  - "feature/new-feature" # First priority branch
+  - "develop" # Second priority (fallback)
+  - "main" # Third priority (last resort)
 
 repositories:
   - "H:/code_base/project1/backend":
-      - "api-service" 
+      - "api-service"
       - "db-service"
       - "auth-service"
 
@@ -56,12 +59,27 @@ repositories:
 ```
 
 In this configuration:
+
 - The tool will try to switch each repository to `feature/new-feature` first
 - If that branch doesn't exist, it will try `develop`
 - If neither exists, it will try `main`
 - Repositories are organized hierarchically with parent paths and subfolders
 
 ## Usage
+
+### Quick Status Check
+
+Get a quick overview of repositories that have uncommitted changes or are out of sync:
+
+```
+git_cli_tool status
+```
+
+Show all repositories (not just those with issues):
+
+```
+git_cli_tool status --all
+```
 
 ### List Repository Status
 
@@ -104,19 +122,29 @@ Stash your changes before switching:
 ```
 git_cli_tool switch --autostash "my-stash-name"
 ```
+
 or using the shorter form:
+
 ```
 git_cli_tool switch -a "my-stash-name"
 ```
 
 Control whether to store branch state history:
+
 ```
 git_cli_tool switch --store-history=false
 ```
 
 Add a description to the history entry:
+
 ```
 git_cli_tool switch --description "Switching to feature branch for sprint 10"
+```
+
+Preview what branches would be switched to without making changes (includes remote branch check):
+
+```
+git_cli_tool switch --dry-run
 ```
 
 ### Refresh Tags
@@ -143,7 +171,13 @@ git_cli_tool history
 
 ### Revert to Previous State
 
-Revert to a previously saved branch state:
+Revert to the most recent saved branch state:
+
+```
+git_cli_tool revert
+```
+
+Revert to a specific state by index:
 
 ```
 git_cli_tool revert <index>
@@ -152,13 +186,13 @@ git_cli_tool revert <index>
 Apply stashes when reverting (on by default):
 
 ```
-git_cli_tool revert <index> --apply-stashes
+git_cli_tool revert --apply-stashes
 ```
 
 Disable stash application:
 
 ```
-git_cli_tool revert <index> --apply-stashes=false
+git_cli_tool revert --apply-stashes=false
 ```
 
 ### Using a Custom Configuration File
@@ -187,6 +221,7 @@ The project has a modular structure for better organization:
   - `history.go`: Branch history tracking
   - `revert.go`: State restoration functionality
   - `pull.go`: Repository pull operations
+  - `status.go`: Quick repository status overview
 - `config/`: Configuration parsing and management
   - `config.go`: Core configuration loading
   - `history.go`: History tracking and state management
