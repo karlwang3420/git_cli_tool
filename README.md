@@ -42,10 +42,14 @@ GitSwitch uses a YAML configuration file (`git_cli_tool.yml` by default) to defi
 ### Example Configuration
 
 ```yaml
-branches:
+# Branches to try when switching (in priority order)
+switch_branches_fallback:
   - "feature/new-feature" # First priority branch
   - "develop" # Second priority (fallback)
   - "main" # Third priority (last resort)
+
+# Whether to record history before switching branches
+record_history: true
 
 repositories:
   - "H:/code_base/project1/backend":
@@ -57,13 +61,15 @@ repositories:
       - "web-client"
       - "mobile-client"
 
-# Optional: Define branch dependencies for the sync command
-branch_dependencies:
-  "feature/extension": "feature/base"
-  "feature/part2": "feature/part1"
+# Optional: Configuration for the sync command
+sync:
+  # Maps child branches to their parent branches
+  branch_dependencies:
+    "feature/extension": "feature/base"
+    "feature/part2": "feature/part1"
 
-# Optional: Fallback branch when parent is not found (default: main)
-fallback_branch: "main"
+  # Fallback branch when parent is not found (default: main)
+  fallback_branch: "main"
 ```
 
 In this configuration:

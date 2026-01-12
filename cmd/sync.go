@@ -76,14 +76,14 @@ func runSyncCmd(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	// Determine parent branch from config
+	// Determine parent branch from config (using nested sync config)
 	parentBranch := ""
-	if configObj.BranchDependencies != nil {
-		parentBranch = configObj.BranchDependencies[targetBranch]
+	if configObj.Sync.BranchDependencies != nil {
+		parentBranch = configObj.Sync.BranchDependencies[targetBranch]
 	}
 
 	// Determine fallback branch
-	fallbackBranch := configObj.FallbackBranch
+	fallbackBranch := configObj.Sync.FallbackBranch
 	if fallbackBranch == "" {
 		fallbackBranch = defaultFallbackBranch
 	}

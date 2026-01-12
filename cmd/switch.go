@@ -47,8 +47,13 @@ func runSwitchCmd(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	// Ensure we have branches to switch to
-	if len(configObj.Branches) == 0 && len(args) == 0 {
+	// Ensure we have branches to switch to (check new field first, then legacy)
+	configBranches := configObj.SwitchBranchesFallback
+	if len(configBranches) == 0 {
+		configBranches = configObj.Branches // backwards compatibility
+	}
+
+	if len(configBranches) == 0 && len(args) == 0 {
 		log.PrintError(log.ErrNoConfigBranches, "No branches specified in the configuration file", nil)
 		os.Exit(1)
 	}
@@ -65,7 +70,7 @@ func runSwitchCmd(cmd *cobra.Command, args []string) {
 	if len(args) > 0 {
 		branches = args
 	} else {
-		branches = configObj.Branches
+		branches = configBranches
 	}
 
 	// Handle dry-run mode

@@ -9,13 +9,19 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// SyncConfig holds configuration for the sync command
+type SyncConfig struct {
+	BranchDependencies map[string]string `yaml:"branch_dependencies,omitempty"` // child -> parent mapping
+	FallbackBranch     string            `yaml:"fallback_branch,omitempty"`     // default: "main"
+}
+
 // Configuration represents the YAML configuration file structure
 type Configuration struct {
-	Branches           []string              `yaml:"branches"`
-	RecordHistory      bool                  `yaml:"record_history,omitempty"`
-	Repositories       []map[string][]string `yaml:"repositories"`
-	BranchDependencies map[string]string     `yaml:"branch_dependencies,omitempty"` // child -> parent mapping
-	FallbackBranch     string                `yaml:"fallback_branch,omitempty"`     // default: "main"
+	SwitchBranchesFallback []string              `yaml:"switch_branches_fallback"` // renamed from "branches"
+	Branches               []string              `yaml:"branches,omitempty"`       // kept for backwards compatibility
+	RecordHistory          bool                  `yaml:"record_history,omitempty"`
+	Repositories           []map[string][]string `yaml:"repositories"`
+	Sync                   SyncConfig            `yaml:"sync,omitempty"` // nested sync configuration
 }
 
 // Repository represents a Git repository configuration
