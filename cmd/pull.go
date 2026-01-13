@@ -46,11 +46,7 @@ func runPullCmd(cmd *cobra.Command, args []string) {
 
 	log.PrintOperation("Pulling latest changes from remote repositories")
 
-	if parallel {
-		git.PullRepositoriesParallel(repositories)
-	} else {
-		git.PullRepositoriesSequential(repositories)
-	}
+	git.PullRepositories(repositories)
 
 	log.PrintSuccess("Pull operation completed")
 }

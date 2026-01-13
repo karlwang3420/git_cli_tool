@@ -43,11 +43,7 @@ func runTagsCmd(cmd *cobra.Command, args []string) {
 
 	log.PrintOperation("Refreshing tags in all repositories")
 
-	if parallel {
-		git.ProcessTagsParallel(repositories)
-	} else {
-		git.ProcessTagsSequential(repositories)
-	}
+	git.ProcessTags(repositories)
 
 	log.PrintSuccess("Tags refresh completed")
 }

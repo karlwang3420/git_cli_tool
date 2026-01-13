@@ -11,7 +11,6 @@ import (
 // Global flags used across multiple commands
 var (
 	configFile string
-	parallel   bool
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -25,7 +24,6 @@ var rootCmd = &cobra.Command{
 func Initialize() {
 	// Global flags
 	rootCmd.PersistentFlags().StringVarP(&configFile, "config", "c", "git_cli_tool.yml", "Path to configuration file")
-	rootCmd.PersistentFlags().BoolVarP(&parallel, "parallel", "p", false, "Execute operations in parallel")
 	
 	// Add all subcommands
 	initSwitchCmd()

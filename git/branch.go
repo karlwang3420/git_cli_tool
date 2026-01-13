@@ -245,44 +245,6 @@ func SwitchBranchWithResult(repoPath string, branches []string) SwitchResult {
 	return result
 }
 
-// SwitchBranchesWithResults switches branches and returns results for aligned display
-func SwitchBranchesWithResults(repositories []config.Repository, branches []string) []SwitchResult {
-	var results []SwitchResult
-	for _, repo := range repositories {
-		result := SwitchBranchWithResult(repo.Path, branches)
-		results = append(results, result)
-	}
-	return results
-}
-
-// SwitchBranchesSequential switches branches in the provided repositories sequentially
-func SwitchBranchesSequential(repositories []config.Repository, branches []string) {
-	for _, repo := range repositories {
-		err := SwitchBranchWithFallback(repo.Path, branches)
-		if err != nil {
-			log.PrintErrorNoExit(log.ErrGitCheckoutFailed, fmt.Sprintf("Error switching branch in %s", repo.Path), err)
-		}
-	}
-}
-
-// SwitchBranchesParallel switches branches in the provided repositories in parallel
-func SwitchBranchesParallel(repositories []config.Repository, branches []string) {
-	var wg sync.WaitGroup
-	wg.Add(len(repositories))
-
-	for _, repo := range repositories {
-		go func(r config.Repository) {
-			defer wg.Done()
-			err := SwitchBranchWithFallback(r.Path, branches)
-			if err != nil {
-				log.PrintErrorNoExit(log.ErrGitCheckoutFailed, fmt.Sprintf("Error switching branch in %s", r.Path), err)
-			}
-		}(repo)
-	}
-
-	wg.Wait()
-}
-
 // SwitchBranchWithFallbackAndStash tries to switch to each branch in the given order, stashing changes if requested
 func SwitchBranchWithFallbackAndStash(repoPath string, branches []string, stashName string) (bool, error) {
 	wasStashed := false
@@ -299,32 +261,8 @@ func SwitchBranchWithFallbackAndStash(repoPath string, branches []string, stashN
 	return wasStashed, SwitchBranchWithFallback(repoPath, branches)
 }
 
-// SwitchBranchesSequentialWithStash switches branches in the provided repositories sequentially, with optional stashing
-func SwitchBranchesSequentialWithStash(repositories []config.Repository, branches []string, stashName string) map[string]bool {
-	stashedRepos := make(map[string]bool)
-
-	for _, repo := range repositories {
-		var err error
-		if stashName != "" {
-			var wasStashed bool
-			wasStashed, err = SwitchBranchWithFallbackAndStash(repo.Path, branches, stashName)
-			if err == nil && wasStashed {
-				stashedRepos[repo.Path] = true
-			}
-		} else {
-			err = SwitchBranchWithFallback(repo.Path, branches)
-		}
-
-		if err != nil {
-			log.PrintErrorNoExit(log.ErrGitCheckoutFailed, fmt.Sprintf("Error switching branch in %s", repo.Path), err)
-		}
-	}
-
-	return stashedRepos
-}
-
-// SwitchBranchesParallelWithStash switches branches in the provided repositories in parallel, with optional stashing
-func SwitchBranchesParallelWithStash(repositories []config.Repository, branches []string, stashName string) map[string]bool {
+// SwitchBranchesWithStash switches branches in the provided repositories in parallel, with optional stashing
+func SwitchBranchesWithStash(repositories []config.Repository, branches []string, stashName string) map[string]bool {
 	var wg sync.WaitGroup
 	var mutex sync.Mutex // Mutex to protect the stashedRepos map from concurrent writes
 	stashedRepos := make(map[string]bool)

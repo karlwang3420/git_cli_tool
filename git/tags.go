@@ -43,20 +43,8 @@ func SyncTags(repoPath string) error {
 	return nil
 }
 
-// ProcessTagsSequential syncs tags for all repositories sequentially
-func ProcessTagsSequential(repositories []config.Repository) {
-	for _, repo := range repositories {
-		log.PrintOperation(fmt.Sprintf("Syncing tags for %s", repo.Path))
-
-		err := SyncTags(repo.Path)
-		if err != nil {
-			log.PrintErrorNoExit(log.ErrGitTagOperationFailed, fmt.Sprintf("Error syncing tags in %s", repo.Path), err)
-		}
-	}
-}
-
-// ProcessTagsParallel syncs tags for all repositories in parallel
-func ProcessTagsParallel(repositories []config.Repository) {
+// ProcessTags syncs tags for all repositories in parallel
+func ProcessTags(repositories []config.Repository) {
 	var wg sync.WaitGroup
 	wg.Add(len(repositories))
 
