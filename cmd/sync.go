@@ -96,12 +96,22 @@ func runSyncCmd(cmd *cobra.Command, args []string) {
 	}
 	log.PrintInfo("")
 
+	resultsChan := make(chan SyncResult, len(repositories))
+
+	// Launch goroutines for parallel sync
+	for _, repo := range repositories {
+		go func(r config.Repository) {
+			resultsChan <- syncRepository(r.Path, targetBranch, parentBranch, fallbackBranch)
+		}(repo)
+	}
+
+	// Collect results
 	var results []SyncResult
 	successCount := 0
 	failCount := 0
 
-	for _, repo := range repositories {
-		result := syncRepository(repo.Path, targetBranch, parentBranch, fallbackBranch)
+	for i := 0; i < len(repositories); i++ {
+		result := <-resultsChan
 		results = append(results, result)
 
 		if result.Success {
