@@ -1,17 +1,19 @@
 # GitSwitch - Multi-Repository Git Branch Management Tool
 
-A command-line tool that helps you efficiently manage branches across multiple Git repositories. It allows you to switch branches in multiple repositories simultaneously, with fallback logic if preferred branches don't exist, and also provides functionality for tag management, branch history tracking, and parallel operations.
+A command-line tool that helps you efficiently manage branches across multiple Git repositories. It allows you to switch branches in multiple repositories simultaneously, with fallback logic if preferred branches don't exist, and provides tag management, branch history tracking, and push/pull operations—all running in parallel for fast execution.
 
 ## Features
 
 - **Branch Switching with Fallback Logic**: Automatically attempts to switch to branches in a priority order, with fallbacks if preferred branches don't exist
-- **Tag Management**: Easily delete local tags and fetch the latest tags from remotes across all repositories
+- **Tag Management**: Easily sync tags with remote across all repositories
 - **Hierarchical Configuration**: Manages repositories using a parent-subfolder structure in a YAML configuration file
-- **Parallel Processing**: Option to run operations in parallel for faster execution in large repository structures
+- **Parallel Processing**: All operations run in parallel by default for maximum speed
 - **Repository Status Overview**: View the current state of all repositories
 - **Stash Management**: Stash your changes before switching branches with automatic tracking
 - **Branch History**: Save and restore previous branch states across all repositories
 - **Pull Operations**: Pull the latest changes from remote repositories
+- **Push Operations**: Push all repositories to remote, auto-publishing branches if needed
+- **Branch Sync**: Merge parent branches into child branches across all repositories
 
 ## Installation
 
@@ -105,16 +107,18 @@ git_cli_tool list
 
 ### Pull Latest Changes
 
-Pull the latest changes from remote repositories for all configured repositories:
+Pull the latest changes from remote repositories:
 
 ```
 git_cli_tool pull
 ```
 
-Use parallel processing for faster pulling:
+### Push All Repositories
+
+Push all repositories to remote. Branches without an upstream will be published automatically:
 
 ```
-git_cli_tool pull --parallel
+git_cli_tool push
 ```
 
 ### Switch Branches
@@ -123,12 +127,6 @@ Switch branches in all repositories according to the priority defined in the con
 
 ```
 git_cli_tool switch
-```
-
-Use parallel processing for faster execution:
-
-```
-git_cli_tool switch --parallel
 ```
 
 Stash your changes before switching:
@@ -143,6 +141,12 @@ or using the shorter form:
 git_cli_tool switch -a "my-stash-name"
 ```
 
+Preview what branches would be switched to without making changes:
+
+```
+git_cli_tool switch --dry-run
+```
+
 Control whether to store branch state history:
 
 ```
@@ -153,12 +157,6 @@ Add a description to the history entry:
 
 ```
 git_cli_tool switch --description "Switching to feature branch for sprint 10"
-```
-
-Preview what branches would be switched to without making changes (includes remote branch check):
-
-```
-git_cli_tool switch --dry-run
 ```
 
 ### Sync Branch with Parent
@@ -176,20 +174,14 @@ This will:
 3. Merge the parent branch into `feature/extension`
 4. If the parent branch doesn't exist, fall back to `main` (or your configured `fallback_branch`)
 
-The sync command handles merge conflicts gracefully - it will report which repositories had conflicts and abort the merge, leaving those repos in a clean state for manual resolution.
+The sync command handles merge conflicts gracefully—it will report which repositories had conflicts and leave them for manual resolution.
 
 ### Refresh Tags
 
-Delete all local tags and fetch the latest tags from remotes for all repositories:
+Sync all tags with remote (updates, adds new, removes deleted):
 
 ```
 git_cli_tool tags
-```
-
-Use parallel processing for faster tag refresh:
-
-```
-git_cli_tool tags --parallel
 ```
 
 ### View Branch History
@@ -233,7 +225,6 @@ You can specify a different configuration file with any command:
 ```
 git_cli_tool list --config other-config.yml
 git_cli_tool switch --config other-config.yml
-git_cli_tool tags --config other-config.yml
 ```
 
 ## Project Structure
@@ -244,7 +235,6 @@ The project has a modular structure for better organization:
 
 - `main.go`: Entry point of the application
 - `cmd/`: Command-line interface implementation using Cobra
-  - `cmd.go`: Package documentation
   - `root.go`: Core command structure and global flags
   - `switch.go`: Branch switching functionality
   - `list.go`: Repository listing operations
@@ -252,17 +242,11 @@ The project has a modular structure for better organization:
   - `history.go`: Branch history tracking
   - `revert.go`: State restoration functionality
   - `pull.go`: Repository pull operations
+  - `push.go`: Repository push operations
   - `status.go`: Quick repository status overview
   - `sync.go`: Branch dependency synchronization
 - `config/`: Configuration parsing and management
-  - `config.go`: Core configuration loading
-  - `history.go`: History tracking and state management
 - `git/`: Git operations implementation
-  - `git.go`: Package documentation
-  - `branch.go`: Branch-related operations
-  - `stash.go`: Stash management functions
-  - `tags.go`: Tag operations
-  - `util.go`: Common utility functions
 
 ## License
 

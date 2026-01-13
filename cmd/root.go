@@ -32,6 +32,7 @@ func Initialize() {
 	initHistoryCmd()
 	initRevertCmd()
 	initPullCmd()
+	initPushCmd()
 	initStatusCmd()
 	initSyncCmd()
 	
@@ -42,6 +43,7 @@ func Initialize() {
 	rootCmd.AddCommand(historyCmd)
 	rootCmd.AddCommand(revertCmd)
 	rootCmd.AddCommand(pullCmd)
+	rootCmd.AddCommand(pushCmd)
 	rootCmd.AddCommand(statusCmd)
 	rootCmd.AddCommand(syncCmd)
 }
