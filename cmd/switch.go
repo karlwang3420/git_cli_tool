@@ -145,9 +145,9 @@ func runSwitchCmd(cmd *cobra.Command, args []string) {
 					if result.AlreadyOnIt {
 						log.PrintSuccess(fmt.Sprintf("%-30s %s → [ALREADY ON TARGET]", result.RepoName, result.ToBranch))
 					} else if result.FromRemote {
-						log.PrintInfo(fmt.Sprintf("%-30s %s → %s (from remote)", result.RepoName, result.FromBranch, result.ToBranch))
+						log.PrintSuccess(fmt.Sprintf("%-30s %s → %s (from remote)", result.RepoName, result.FromBranch, result.ToBranch))
 					} else {
-						log.PrintInfo(fmt.Sprintf("%-30s %s → %s", result.RepoName, result.FromBranch, result.ToBranch))
+						log.PrintSuccess(fmt.Sprintf("%-30s %s → %s", result.RepoName, result.FromBranch, result.ToBranch))
 					}
 				} else {
 					failCount++
@@ -164,9 +164,9 @@ func runSwitchCmd(cmd *cobra.Command, args []string) {
 					if result.AlreadyOnIt {
 						log.PrintSuccess(fmt.Sprintf("%-30s %s → [ALREADY ON TARGET]", result.RepoName, result.ToBranch))
 					} else if result.FromRemote {
-						log.PrintInfo(fmt.Sprintf("%-30s %s → %s (from remote)", result.RepoName, result.FromBranch, result.ToBranch))
+						log.PrintSuccess(fmt.Sprintf("%-30s %s → %s (from remote)", result.RepoName, result.FromBranch, result.ToBranch))
 					} else {
-						log.PrintInfo(fmt.Sprintf("%-30s %s → %s", result.RepoName, result.FromBranch, result.ToBranch))
+						log.PrintSuccess(fmt.Sprintf("%-30s %s → %s", result.RepoName, result.FromBranch, result.ToBranch))
 					}
 				} else {
 					failCount++
