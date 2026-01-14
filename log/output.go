@@ -7,7 +7,7 @@ import (
 
 // FormatWarning formats a warning message with a consistent structure
 func FormatWarning(message string) string {
-	return fmt.Sprintf("[WARN] %s", message)
+	return fmt.Sprintf("[WARN]    %s", message)
 }
 
 // FormatSuccess formats a success message with a consistent structure
@@ -17,7 +17,7 @@ func FormatSuccess(message string) string {
 
 // FormatDebug formats a debug message with a consistent structure
 func FormatDebug(message string) string {
-	return fmt.Sprintf("[DEBUG] %s", message)
+	return fmt.Sprintf("[DEBUG]   %s", message)
 }
 
 // PrintError prints an error message with the appropriate error code and exits with code 1

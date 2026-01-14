@@ -1,0 +1,41 @@
+switch_branches_fallback:
+  #- 86evv71pp(ftl-node-PreAuth檢查)
+  - 86ew465vk(Infra-Logging)
+  - 86evqmj92(Company-Type一對多)
+  - "main"
+
+record_history: true
+
+repositories:
+  - "C:\Users\Karl\CodeBase\FTL\backend\resource":
+      - "ftl-auth"
+      - "ftl-account"
+      - "ftl-batch"
+      - "ftl-common"
+      - "ftl-common-resource"
+      - "ftl-dss"
+      - "ftl-event"
+      - "ftl-model"
+      - "ftl-txn"
+      - "ftl-repository"
+      - "ftl-properties"
+      - "ftl-infra"
+      - "ftl-authserver"
+      - "ftl-auth-old"
+
+  - "C:\Users\Karl\CodeBase\FTL\backend\channel":
+      - "ftl-admin"
+      - "ftl-card"
+      - "ftl-security"
+      - "ftl-wallet"
+
+sync: 
+  branch_dependencies:
+    "86ew465vk(Infra-Logging)": "86evqmj92(Company-Type一對多)"
+    "86evv71pp(ftl-node-PreAuth檢查)": "86evqmj92(Company-Type一對多)"
+    #"child": "parent"
+
+
+
+
+
