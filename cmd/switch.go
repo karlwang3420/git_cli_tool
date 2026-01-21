@@ -143,7 +143,7 @@ func runSwitchCmd(cmd *cobra.Command, args []string) {
 				} else {
 					log.PrintSuccess(fmt.Sprintf("%-30s %s → %s", result.RepoName, result.FromBranch, result.ToBranch))
 				}
-			} else {
+		} else {
 				failCount++
 				log.PrintWarning(fmt.Sprintf("%-30s %s → [FAILED: %s]", result.RepoName, result.FromBranch, result.Message))
 			}

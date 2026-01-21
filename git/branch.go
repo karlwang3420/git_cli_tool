@@ -15,14 +15,14 @@ import (
 
 // SwitchResult holds the result of switching a branch in a repository
 type SwitchResult struct {
-	RepoPath     string
-	RepoName     string
-	FromBranch   string
-	ToBranch     string
-	Success      bool
-	Message      string
-	FromRemote   bool
-	AlreadyOnIt  bool
+	RepoPath              string
+	RepoName              string
+	FromBranch            string
+	ToBranch              string
+	Success               bool
+	Message               string
+	FromRemote            bool
+	AlreadyOnIt           bool
 }
 
 
@@ -185,63 +185,129 @@ func SwitchBranchWithResult(repoPath string, branches []string) SwitchResult {
 	// Get current branch
 	result.FromBranch, _ = GetCurrentBranch(absPath)
 
-	// Try each branch in order
-	for _, branch := range branches {
-		// Check if already on this branch
+	// First, find which branches exist and where the current branch falls in priority
+	// This helps us determine if we're already on the best available branch
+	type branchInfo struct {
+		name       string
+		existsLocal  bool
+		existsRemote bool
+		priority   int // index in the branches slice (lower = higher priority)
+	}
+	
+	branchesInfo := make([]branchInfo, len(branches))
+	currentBranchPriority := -1 // -1 means current branch is not in the list
+	
+	// Fetch remotes once upfront (for efficiency)
+	fetchCmd := exec.Command("git", "-C", absPath, "fetch")
+	fetchCmd.CombinedOutput() // Ignore errors
+	
+	for i, branch := range branches {
+		info := branchInfo{name: branch, priority: i}
+		
+		// Check if this is the current branch
 		if result.FromBranch == branch {
-			result.ToBranch = branch
-			result.Success = true
-			result.AlreadyOnIt = true
-			result.Message = "already on target"
-			return result
+			currentBranchPriority = i
+			info.existsLocal = true // Current branch obviously exists
+		} else {
+			// Check if branch exists locally
+			exists, _ := CheckBranchExists(absPath, branch)
+			info.existsLocal = exists
 		}
-
-		// Check if branch exists locally
-		branchExists, err := CheckBranchExists(absPath, branch)
-		if err != nil {
-			continue
+		
+		// Check if branch exists on remote
+		if !info.existsLocal {
+			exists, _ := CheckRemoteBranchExists(absPath, branch)
+			info.existsRemote = exists
 		}
-
-		if branchExists {
-			cmd := exec.Command("git", "-C", absPath, "checkout", branch)
-			_, err := cmd.CombinedOutput()
-			if err != nil {
-				continue
-			}
-			result.ToBranch = branch
-			result.Success = true
-			result.Message = "switched"
-			return result
+		
+		branchesInfo[i] = info
+	}
+	
+	// Find the best available branch (highest priority that exists)
+	bestBranchIdx := -1
+	for i, info := range branchesInfo {
+		if info.existsLocal || info.existsRemote {
+			bestBranchIdx = i
+			break
 		}
-
-		// Try to fetch and check remote
-		fetchCmd := exec.Command("git", "-C", absPath, "fetch")
-		fetchCmd.CombinedOutput()
-
-		remoteBranchExists, err := CheckRemoteBranchExists(absPath, branch)
-		if err != nil || !remoteBranchExists {
-			continue
-		}
-
-		// Create tracking branch
-		trackCmd := exec.Command("git", "-C", absPath, "checkout", "-b", branch, "--track", "origin/"+branch)
-		_, err = trackCmd.CombinedOutput()
-		if err != nil {
-			// Try direct checkout
-			checkoutCmd := exec.Command("git", "-C", absPath, "checkout", branch)
-			_, err = checkoutCmd.CombinedOutput()
-			if err != nil {
-				continue
-			}
-		}
-		result.ToBranch = branch
-		result.Success = true
-		result.FromRemote = true
-		result.Message = "switched (from remote)"
+	}
+	
+	// No branches found at all
+	if bestBranchIdx == -1 {
+		result.Message = "no matching branch found"
 		return result
 	}
-
-	result.Message = fmt.Sprintf("no matching branch found")
+	
+	bestBranch := branchesInfo[bestBranchIdx]
+	
+	// Check if we're already on the best available branch
+	if currentBranchPriority == bestBranchIdx {
+		result.ToBranch = bestBranch.name
+		result.Success = true
+		result.AlreadyOnIt = true
+		result.Message = "already on target"
+		return result
+	}
+	
+	// We're not on the best branch - need to switch
+	// Try to switch to the best available branch
+	if bestBranch.existsLocal {
+		cmd := exec.Command("git", "-C", absPath, "checkout", bestBranch.name)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			// Check if the error is due to uncommitted changes
+			outputStr := string(output)
+			if strings.Contains(outputStr, "uncommitted") ||
+				strings.Contains(outputStr, "Please commit your changes") ||
+				strings.Contains(outputStr, "would be overwritten") ||
+				strings.Contains(outputStr, "local changes") {
+				result.Message = "uncommitted changes"
+			} else {
+				result.Message = fmt.Sprintf("checkout failed: %v", err)
+			}
+			return result
+		}
+		result.ToBranch = bestBranch.name
+		result.Success = true
+		result.Message = "switched"
+		return result
+	}
+	
+	// Best branch is only on remote - create tracking branch
+	trackCmd := exec.Command("git", "-C", absPath, "checkout", "-b", bestBranch.name, "--track", "origin/"+bestBranch.name)
+	output, err := trackCmd.CombinedOutput()
+	if err != nil {
+		// Check if the error is due to uncommitted changes
+		outputStr := string(output)
+		if strings.Contains(outputStr, "uncommitted") ||
+			strings.Contains(outputStr, "Please commit your changes") ||
+			strings.Contains(outputStr, "would be overwritten") ||
+			strings.Contains(outputStr, "local changes") {
+			result.Message = "uncommitted changes"
+			return result
+		}
+		
+		// Try direct checkout as fallback
+		checkoutCmd := exec.Command("git", "-C", absPath, "checkout", bestBranch.name)
+		output, err = checkoutCmd.CombinedOutput()
+		if err != nil {
+			outputStr = string(output)
+			if strings.Contains(outputStr, "uncommitted") ||
+				strings.Contains(outputStr, "Please commit your changes") ||
+				strings.Contains(outputStr, "would be overwritten") ||
+				strings.Contains(outputStr, "local changes") {
+				result.Message = "uncommitted changes"
+			} else {
+				result.Message = fmt.Sprintf("checkout failed: %v", err)
+			}
+			return result
+		}
+	}
+	
+	result.ToBranch = bestBranch.name
+	result.Success = true
+	result.FromRemote = true
+	result.Message = "switched (from remote)"
 	return result
 }
 
